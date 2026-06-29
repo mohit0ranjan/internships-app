@@ -1,0 +1,504 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  APPLICANT
+  ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  SCREENING
+  INTERVIEW
+  SELECTED
+  REJECTED
+  OFFER_LETTER_SENT
+  JOINED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+}
+
+enum ProgressStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  REJECTED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  GENERAL
+  TECHNICAL
+  PAYMENT
+  CERTIFICATE
+  MENTORSHIP
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum CertificateStatus {
+  PENDING
+  GENERATED
+  ISSUED
+  REVOKED
+}
+
+enum BatchStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  role          Role      @default(APPLICANT)
+  image         String?
+  phone         String?
+  college       String?
+  degree        String?
+  branch        String?
+  year          String?
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  applications    Application[]
+  attendances     Attendance[]
+  weeklyProgress  WeeklyProgress[]
+  certificates    Certificate[]
+  supportTickets  SupportTicket[]
+  messages        TicketMessage[]
+  notifications   Notification[]
+  batches         Batch[]          @relation("UserBatches")
+  auditLogs       AuditLog[]
+  loginHistory    LoginHistory[]
+  candidateProfile CandidateProfile?
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  status    String   // SUCCESS, FAILED
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Internship {
+  id             String   @id @default(cuid())
+  title          String
+  domain         String
+  description    String   @db.Text
+  duration       String
+  mode           String   @default("On-site")
+  stipend        String?
+  eligibility    String
+  centre         String
+  startDate      DateTime
+  endDate        DateTime
+  maxSeats       Int      @default(0)
+  seatsAvailable Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  applications Application[]
+  projects     Project[]
+  batches      Batch[]
+  certificates Certificate[]
+
+  @@index([domain])
+  @@index([centre])
+  @@index([isActive])
+}
+
+model Application {
+  id             String            @id @default(cuid())
+  userId         String
+  internshipId   String
+  status         ApplicationStatus @default(SUBMITTED)
+  screeningScore Int?
+  resumeUrl      String?
+  shortlistedAt  DateTime?
+  rejectedAt     DateTime?
+  notes          String?           @db.Text
+  githubLink     String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  projectId      String?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Restrict)
+  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payment    Payment?
+  assessmentAttempt AssessmentAttempt?
+
+  @@unique([userId, internshipId])
+  @@index([userId])
+  @@index([internshipId])
+  @@index([status])
+  @@index([projectId])
+}
+
+model Project {
+  id            String   @id @default(cuid())
+  title         String
+  description   String   @db.Text
+  internshipId  String
+  mentorName    String?
+  mentorEmail   String?
+  githubRepoUrl String?
+  techStack     String?
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  internship     Internship       @relation(fields: [internshipId], references: [id], onDelete: Restrict)
+  applications   Application[]
+  weeklyProgress WeeklyProgress[]
+
+  @@index([internshipId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  applicationId String        @unique
+  orderId       String?       @unique
+  amount        Decimal       @db.Decimal(10,2)
+  status        PaymentStatus @default(PENDING)
+  method        String?
+  transactionId String?       @unique
+  receiptUrl    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  @@index([status])
+}
+
+model Attendance {
+  id           String           @id @default(cuid())
+  userId       String
+  date         DateTime
+  status       AttendanceStatus @default(PRESENT)
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  remarks      String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+model WeeklyProgress {
+  id           String         @id @default(cuid())
+  userId       String
+  projectId    String
+  weekNumber   Int
+  githubLink   String?
+  summary      String         @db.Text
+  status       ProgressStatus @default(SUBMITTED)
+  adminRemarks String?        @db.Text
+  submittedAt  DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId, weekNumber])
+  @@index([status])
+}
+
+model Certificate {
+  id                String            @id @default(cuid())
+  userId            String
+  internshipId      String
+  certificateNumber String            @unique
+  issueDate         DateTime?
+  qrCode            String?           @db.Text
+  downloadUrl       String?
+  status            CertificateStatus @default(PENDING)
+  grade             String?
+  isVerified        Boolean           @default(false)
+  verifiedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, internshipId])
+  @@index([userId])
+  @@index([internshipId])
+  @@index([status])
+}
+
+model SupportTicket {
+  id        String         @id @default(cuid())
+  userId    String
+  subject   String
+  category  TicketCategory @default(GENERAL)
+  priority  TicketPriority @default(MEDIUM)
+  status    TicketStatus   @default(OPEN)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  senderId    String
+  content     String   @db.Text
+  isFromAdmin Boolean  @default(false)
+  timestamp   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String           @db.Text
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([userId, isRead])
+}
+
+model Batch {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  internshipId String
+  startDate    DateTime
+  endDate      DateTime
+  isActive     Boolean     @default(true)
+  status       BatchStatus @default(UPCOMING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  students   User[]     @relation("UserBatches")
+
+  @@index([internshipId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  subject   String
+  body      String   @db.Text
+  variables String   // Comma-separated list of variables like {{name}}, {{email}}
+  type      String   // e.g., "WELCOME", "CREDENTIALS", "SHORTLISTED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CMSContent {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  content     String   @db.Text
+  section     String   // e.g., "FAQ", "PROGRAMME"
+  isPublished Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([section])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  body        String   @db.Text
+  type        String   @default("INFO") // INFO | WARNING | IMPORTANT
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([publishedAt])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CandidateProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  university       String?
+  graduationYear   String?
+  cgpa             String?
+  city             String?
+  state            String?
+  linkedinUrl      String?
+  preferredDomain  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Assessment {
+  id          String   @id @default(cuid())
+  title       String
+  duration    Int      // in minutes
+  totalMarks  Int
+  passingMarks Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions   AssessmentQuestion[]
+  attempts    AssessmentAttempt[]
+}
+
+model AssessmentQuestion {
+  id            String   @id @default(cuid())
+  assessmentId  String
+  question      String   @db.Text
+  options       String   @db.Text // JSON string array
+  correctAnswer String
+  explanation   String?  @db.Text
+  difficulty    String   // EASY, MEDIUM, HARD
+  topic         String
+  marks         Int      @default(1)
+  negativeMarks Float    @default(0)
+  
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+}
+
+model AssessmentAttempt {
+  id              String   @id @default(cuid())
+  applicationId   String   @unique
+  assessmentId    String
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  status          String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, TIMEOUT, TERMINATED
+  score           Float?
+  percentage      Float?
+  correctCount    Int?
+  wrongCount      Int?
+  skippedCount    Int?
+  timeTaken       Int?     // in seconds
+  tabSwitches     Int      @default(0)
+  fullscreenExits Int      @default(0)
+  warnings        Int      @default(0)
+  
+  assessment      Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  application     Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  answers         AssessmentAnswer[]
+  violations      AssessmentViolation[]
+}
+
+model AssessmentAnswer {
+  id             String   @id @default(cuid())
+  attemptId      String
+  questionId     String
+  selectedOption String?
+  isCorrect      Boolean?
+  timeTaken      Int?     // in seconds
+  
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}
+
+model AssessmentViolation {
+  id          String   @id @default(cuid())
+  attemptId   String
+  type        String   // TAB_SWITCH, FULLSCREEN_EXIT, BLUR
+  timestamp   DateTime @default(now())
+
+  attempt     AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}

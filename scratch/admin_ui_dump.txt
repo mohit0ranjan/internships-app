@@ -1,0 +1,1311 @@
+
+
+--- FILE: \applicants\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, Filter, MoreHorizontal, Download, FileText, Check, X, Loader2 } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function ApplicantsPage() {
+  const [filter, setFilter] = useState("ALL")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  
+  const { data, error, isLoading, mutate } = useSWR('/api/admin/applicants')
+
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    setUpdatingId(id);
+    try {
+      const res = await fetch('/api/admin/applicants', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to update status');
+      
+      toast.success(`Applicant status updated to ${newStatus}`);
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch(status) {
+      case 'SUBMITTED': return <Badge variant="outline">Submitted</Badge>;
+      case 'SCREENING': return <Badge variant="secondary">Screening</Badge>;
+      case 'INTERVIEW': return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Interview</Badge>;
+      case 'SELECTED': return <Badge variant="success">Selected</Badge>;
+      case 'REJECTED': return <Badge variant="destructive">Rejected</Badge>;
+      case 'OFFER_LETTER_SENT': return <Badge variant="default" className="bg-purple-500">Offer Sent</Badge>;
+      case 'JOINED': return <Badge variant="default" className="bg-green-600">Joined</Badge>;
+      default: return <Badge>{status}</Badge>;
+    }
+  }
+
+  const applicants = data?.applicants || [];
+  
+  let filteredApplicants = applicants;
+  
+  if (filter !== "ALL") {
+    filteredApplicants = filteredApplicants.filter((a: any) => a.status === filter);
+  }
+
+  if (searchQuery) {
+    filteredApplicants = filteredApplicants.filter((a: any) => 
+      a.user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      a.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Applicant Management</h2>
+          <p className="text-muted-foreground">Review, shortlist, and manage internship applications.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div className="flex gap-2 items-center flex-1">
+              <div className="relative w-full max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search applicants..." 
+                  className="pl-9" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="icon"><Filter className="h-4 w-4" /></Button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+              <Button variant={filter === "ALL" ? "default" : "outline"} size="sm" onClick={() => setFilter("ALL")}>All</Button>
+              <Button variant={filter === "SUBMITTED" ? "default" : "outline"} size="sm" onClick={() => setFilter("SUBMITTED")}>New</Button>
+              <Button variant={filter === "SCREENING" ? "default" : "outline"} size="sm" onClick={() => setFilter("SCREENING")}>Screening</Button>
+              <Button variant={filter === "INTERVIEW" ? "default" : "outline"} size="sm" onClick={() => setFilter("INTERVIEW")}>Interview</Button>
+              <Button variant={filter === "SELECTED" ? "default" : "outline"} size="sm" onClick={() => setFilter("SELECTED")}>Selected</Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                <tr>
+                  <th className="px-4 py-3 rounded-tl-lg">Applicant Details</th>
+                  <th className="px-4 py-3">Domain</th>
+                  <th className="px-4 py-3">Applied Date</th>
+                  <th className="px-4 py-3">Score</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right rounded-tr-lg">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-600" />
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-red-500">Failed to load applicants</td>
+                  </tr>
+                ) : filteredApplicants.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">No applicants found.</td>
+                  </tr>
+                ) : (
+                  filteredApplicants.map((app: any) => (
+                    <tr key={app.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-navy-900 dark:text-white">{app.user.name}</div>
+                        <div className="text-xs text-muted-foreground">{app.user.email}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">ID: {app.id}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium">{app.internship.domain}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {new Date(app.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-4">
+                        {app.screeningScore ? (
+                          <Badge variant="outline" className={app.screeningScore >= 80 ? 'border-green-500 text-green-600' : ''}>
+                            {app.screeningScore}/100
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {getStatusBadge(app.status)}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" title="View Resume">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          
+                          {app.status === 'SUBMITTED' || app.status === 'SCREENING' || app.status === 'INTERVIEW' ? (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50" 
+                                title="Mark Selected"
+                                onClick={() => handleUpdateStatus(app.id, 'SELECTED')}
+                                disabled={updatingId === app.id}
+                              >
+                                {updatingId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50" 
+                                title="Reject"
+                                onClick={() => handleUpdateStatus(app.id, 'REJECTED')}
+                                disabled={updatingId === app.id}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+--- FILE: \batches\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, Plus, Calendar, Users } from "lucide-react"
+
+export default function BatchesPage() {
+  const batches = [
+    { id: "WBL-AI-2026-01", internship: "AI & Machine Learning", students: 45, start: "Jul 01, 2026", end: "Dec 31, 2026", status: "UPCOMING" },
+    { id: "WBL-CYB-2026-02", internship: "Cyber Security", students: 28, start: "Jul 15, 2026", end: "Oct 15, 2026", status: "UPCOMING" },
+    { id: "WBL-IOT-2026-01", internship: "IoT & Embedded", students: 32, start: "Jan 01, 2026", end: "Jun 30, 2026", status: "ONGOING" },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Batch Management</h2>
+          <p className="text-muted-foreground">Manage training batches and date schedules.</p>
+        </div>
+        <Button><Plus className="mr-2 h-4 w-4" /> Create New Batch</Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search batches..." className="pl-9" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {batches.map((batch) => (
+              <Card key={batch.id} className="border hover:border-primary-300 dark:hover:border-primary-800 transition-colors shadow-sm">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="outline" className="font-mono text-xs">{batch.id}</Badge>
+                    <Badge variant={batch.status === "ONGOING" ? "success" : "default"}>{batch.status}</Badge>
+                  </div>
+                  <CardTitle className="text-base">{batch.internship}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Users className="h-4 w-4 mr-2" /> {batch.students} Students Enrolled
+                  </div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4 mr-2" /> {batch.start} - {batch.end}
+                  </div>
+                  <div className="pt-4 border-t flex justify-between items-center mt-2">
+                    <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700">Manage Students</Button>
+                    <Button variant="ghost" size="sm">Edit Details</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+--- FILE: \certificates\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Award, Search, CheckCircle, Download, ExternalLink } from "lucide-react"
+import Link from "next/link"
+
+export default function CertificateGenerationPage() {
+  const [loading, setLoading] = useState(false)
+  const [generatedCert, setGeneratedCert] = useState<{id: string, name: string, number: string, qr: string} | null>(null)
+  
+  // Dummy completed interns
+  const completedInterns = [
+    { id: "usr-1", name: "Aditi Rao", email: "aditi@example.com", domain: "AI & Machine Learning", completion: 100, attendance: "98%" },
+    { id: "usr-2", name: "Varun Sharma", email: "varun@example.com", domain: "Cyber Security", completion: 100, attendance: "95%" },
+  ];
+
+  const handleGenerate = async (id: string, name: string) => {
+    setLoading(true);
+    // Simulate API call to /api/admin/certificates/generate
+    setTimeout(() => {
+      setGeneratedCert({
+        id,
+        name,
+        number: `CSDAC-WBL-2026-X79K2P`,
+        qr: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://internships.csdac.in/verify/CSDAC-WBL-2026-X79K2P"
+      });
+      setLoading(false);
+    }, 1500);
+  }
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Certificate Generation</h2>
+        <p className="text-muted-foreground">Generate verifiable QR-enabled certificates for completed interns.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Eligible Interns</CardTitle>
+            <CardDescription>Interns with 100% completion status</CardDescription>
+            <div className="relative mt-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search by name or email..." className="pl-9" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {completedInterns.map((intern) => (
+                <div key={intern.id} className="flex flex-col gap-2 p-4 border rounded-lg hover:bg-navy-50 dark:hover:bg-navy-900/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-semibold text-sm">{intern.name}</div>
+                      <div className="text-xs text-muted-foreground">{intern.email}</div>
+                    </div>
+                    <Badge variant="success">Completed</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="text-xs bg-white dark:bg-navy-950 p-2 rounded border">
+                      <div className="text-muted-foreground mb-1">Project Progress</div>
+                      <div className="font-semibold text-green-600">{intern.completion}%</div>
+                    </div>
+                    <div className="text-xs bg-white dark:bg-navy-950 p-2 rounded border">
+                      <div className="text-muted-foreground mb-1">Attendance</div>
+                      <div className="font-semibold text-accent-600">{intern.attendance}</div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    size="sm" 
+                    className="mt-2 w-full flex items-center gap-2"
+                    onClick={() => handleGenerate(intern.id, intern.name)}
+                    disabled={loading}
+                  >
+                    <Award className="h-4 w-4" /> 
+                    Issue Certificate
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div>
+          {generatedCert ? (
+            <Card className="border-accent-200 dark:border-accent-900 shadow-lg overflow-hidden">
+              <div className="bg-accent-500 p-1"></div>
+              <CardHeader className="bg-white dark:bg-navy-900 pb-4">
+                <div className="flex items-center gap-2 text-accent-600">
+                  <CheckCircle className="h-5 w-5" />
+                  <CardTitle>Certificate Issued Successfully</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                
+                <div className="border-2 border-navy-100 dark:border-navy-800 rounded-lg p-6 flex flex-col items-center justify-center text-center relative bg-[url('/assets/img/dummy_img/bg-pattern.svg')]">
+                  <div className="absolute inset-0 bg-white/90 dark:bg-navy-900/90 rounded-lg"></div>
+                  
+                  <div className="relative z-10 space-y-4">
+                    <img src="/assets/img/cdacLogo.png" alt="CSDAC" className="h-12 mx-auto" />
+                    
+                    <div>
+                      <h4 className="text-sm font-semibold tracking-widest uppercase text-muted-foreground mb-2">Certificate of Completion</h4>
+                      <div className="text-xl font-bold font-serif text-navy-900 dark:text-white">
+                        {generatedCert.name}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-4">
+                      <img src={generatedCert.qr} alt="Verification QR" className="h-24 w-24 p-1 bg-white border shadow-sm rounded" />
+                    </div>
+                    
+                    <div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Certificate No.</div>
+                      <div className="text-sm font-mono font-bold text-navy-900 dark:text-accent-400">
+                        {generatedCert.number}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </CardContent>
+              <CardFooter className="bg-navy-50 dark:bg-navy-900/50 border-t flex gap-2">
+                <Button className="flex-1" variant="outline">
+                  <Download className="h-4 w-4 mr-2" /> Download PDF
+                </Button>
+                <Button className="flex-1" asChild>
+                  <Link href={`/verify/${generatedCert.number}`} target="_blank">
+                    <ExternalLink className="h-4 w-4 mr-2" /> Verify Page
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card className="h-full flex flex-col items-center justify-center p-8 text-center border-dashed border-2">
+              <div className="h-16 w-16 rounded-full bg-navy-50 dark:bg-navy-900 flex items-center justify-center mb-4">
+                <Award className="h-8 w-8 text-navy-300 dark:text-navy-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-navy-900 dark:text-white mb-2">Issue Certificates</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Select an eligible intern to generate their unique certificate number and verifiable QR code.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \layout.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { 
+  BarChart, 
+  Users, 
+  Building, 
+  Briefcase, 
+  CheckSquare, 
+  Award, 
+  CreditCard, 
+  LifeBuoy, 
+  Settings, 
+  LogOut,
+  Bell
+} from "lucide-react";
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await auth();
+
+  if (!session || !session.user || session.user.role !== "ADMIN") {
+    redirect("/login");
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col md:flex-row bg-navy-50 dark:bg-navy-950">
+      {/* Sidebar */}
+      <aside className="w-full md:w-64 bg-navy-950 text-white flex-shrink-0">
+        <div className="h-16 flex items-center px-6 border-b border-navy-800">
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/assets/img/cdacLogo.png" alt="CSDAC" className="h-8 w-8 bg-white rounded-full p-1" />
+            <span className="font-bold text-white">Admin Console</span>
+          </Link>
+        </div>
+        
+        <div className="p-4 h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="mb-6 px-2 py-2">
+            <p className="text-sm font-medium text-white truncate">
+              {session.user?.name}
+            </p>
+            <p className="text-xs text-navy-400 truncate">
+              {session.user?.email}
+            </p>
+            <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-accent-500 text-white uppercase">
+              Administrator
+            </span>
+          </div>
+          
+          <nav className="space-y-1">
+            <Link href="/admin" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <BarChart className="h-4 w-4" /> Analytics
+            </Link>
+            <Link href="/admin/applicants" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Users className="h-4 w-4" /> Applicants
+            </Link>
+            <Link href="/admin/payments" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <CreditCard className="h-4 w-4" /> Payments
+            </Link>
+            <Link href="/admin/workspace" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Building className="h-4 w-4" /> Workspaces
+            </Link>
+            <Link href="/admin/batches" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Users className="h-4 w-4" /> Batches
+            </Link>
+            <Link href="/admin/projects" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Briefcase className="h-4 w-4" /> Projects
+            </Link>
+            <Link href="/admin/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <CheckSquare className="h-4 w-4" /> Attendance
+            </Link>
+            <Link href="/admin/progress" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <CheckSquare className="h-4 w-4" /> Weekly Progress
+            </Link>
+            <Link href="/admin/certificates" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Award className="h-4 w-4" /> Certificates
+            </Link>
+            <Link href="/admin/tickets" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <LifeBuoy className="h-4 w-4" /> Support Tickets
+            </Link>
+            <Link href="/admin/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-navy-800 text-navy-200 hover:text-white">
+              <Settings className="h-4 w-4" /> Settings
+            </Link>
+            
+            <div className="pt-4 mt-4 border-t border-navy-800">
+              <form action="/api/auth/signout" method="POST">
+                <button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-900/50 hover:text-red-300">
+                  <LogOut className="h-4 w-4" /> Sign Out
+                </button>
+              </form>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-navy-50 dark:bg-navy-950">
+        <header className="h-16 flex items-center justify-between px-6 bg-white dark:bg-navy-900 border-b border-navy-100 dark:border-navy-800 shadow-sm">
+          <h1 className="text-lg font-semibold text-navy-900 dark:text-white">Admin Console</h1>
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 text-navy-400 hover:text-navy-900 dark:hover:text-white">
+              <Bell className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
+        <div className="flex-1 overflow-auto p-6">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+
+--- FILE: \page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Users, FileText, CheckCircle, TrendingUp, AlertCircle, ArrowRight, Building, CheckSquare, Award, LifeBuoy, Loader2 } from "lucide-react";
+import Link from "next/link";
+import useSWR from "swr";
+
+export default function AdminDashboard() {
+  const { data, error, isLoading } = useSWR('/api/admin/dashboard');
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Analytics Overview</h2>
+          <p className="text-muted-foreground">Monitor internship portal performance and activities.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline">Export Report</Button>
+          <Button asChild>
+            <Link href="/admin/applicants">View All Applicants</Link>
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        </div>
+      ) : error ? (
+        <div className="p-4 bg-red-50 text-red-600 rounded-md">Failed to load dashboard data.</div>
+      ) : (
+        <>
+          {/* Top Stats */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-white dark:bg-navy-900">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary-900 dark:text-primary-400">{data?.stats?.totalStudents || 0}</div>
+                <p className="text-xs text-green-600 flex items-center mt-1">
+                  Active portal users
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white dark:bg-navy-900">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">New Applications</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-accent-600 dark:text-accent-400">{data?.stats?.pendingApplications || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pending review
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white dark:bg-navy-900">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today&apos;s Attendance</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary-900 dark:text-primary-400">{data?.stats?.todayAttendance || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Students checked in today
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white dark:bg-navy-900">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Open Tickets</CardTitle>
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{data?.stats?.openTickets || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Requires attention
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            {/* Recent Applicants */}
+            <Card className="lg:col-span-4 bg-white dark:bg-navy-900">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Applications</CardTitle>
+                </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin/applicants">View All <ArrowRight className="h-4 w-4 ml-1" /></Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {data?.recentApplications?.length === 0 ? (
+                    <div className="text-muted-foreground text-sm text-center py-4">No recent applications.</div>
+                  ) : (
+                    data?.recentApplications?.map((app: any) => (
+                      <div key={app.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-900 text-xs font-bold uppercase">
+                            {app.user.name.substring(0, 2)}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{app.user.name}</div>
+                            <div className="text-xs text-muted-foreground">{app.internship.domain} • {app.internship.centre}</div>
+                          </div>
+                        </div>
+                        <Badge variant={app.status === 'SUBMITTED' ? 'outline' : 'default'}>
+                          {app.status}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Quick Actions */}
+            <Card className="lg:col-span-3 bg-white dark:bg-navy-900">
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link href="/admin/workspace">
+                    <Building className="h-4 w-4 mr-2" />
+                    Generate Workspace Accounts
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link href="/admin/progress">
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Review Weekly Progress
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link href="/admin/certificates">
+                    <Award className="h-4 w-4 mr-2" />
+                    Generate Certificates
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link href="/admin/tickets">
+                    <LifeBuoy className="h-4 w-4 mr-2" />
+                    Resolve Support Tickets
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+--- FILE: \progress\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, GitBranch, FileText, MessageSquare, Check, X } from "lucide-react"
+
+export default function ProgressReviewPage() {
+  const [activeReview, setActiveReview] = useState<string | null>(null)
+  
+  // Dummy pending submissions
+  const pendingReviews = [
+    { 
+      id: "rev-1", 
+      name: "Rahul Sharma", 
+      project: "AI Healthcare System", 
+      week: 5, 
+      date: "Jul 05, 2026",
+      github: "https://github.com/rahul/ai-health/commit/8f2c",
+      summary: "Completed the initial training phase for the CNN. Achieved 85% accuracy on the validation set. Planning to tune hyperparameters next week."
+    },
+    { 
+      id: "rev-2", 
+      name: "Sneha Patel", 
+      project: "Network Security Audit Tool", 
+      week: 4, 
+      date: "Jul 04, 2026",
+      github: "https://github.com/sneha/net-audit/pull/12",
+      summary: "Implemented the packet sniffing module using Scapy. Had some issues with permissions but resolved them. Next week will work on the reporting dashboard."
+    }
+  ];
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Weekly Progress Review</h2>
+        <p className="text-muted-foreground">Review and approve intern weekly submissions.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Pending Reviews</CardTitle>
+            <CardDescription>Submissions awaiting your feedback</CardDescription>
+            <div className="relative mt-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search intern or project..." className="pl-9" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pendingReviews.map((review) => (
+                <div 
+                  key={review.id} 
+                  className={`flex flex-col gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${activeReview === review.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'hover:bg-navy-50 dark:hover:bg-navy-900/50'}`}
+                  onClick={() => setActiveReview(review.id)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-semibold text-sm">{review.name}</div>
+                      <div className="text-xs text-muted-foreground truncate w-48">{review.project}</div>
+                    </div>
+                    <Badge variant="warning" className="text-[10px]">Week {review.week}</Badge>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Submitted: {review.date}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-3">
+          {activeReview ? (
+            (() => {
+              const review = pendingReviews.find(r => r.id === activeReview);
+              if (!review) return null;
+              
+              return (
+                <Card className="shadow-md h-full flex flex-col">
+                  <CardHeader className="border-b bg-navy-50/50 dark:bg-navy-900/30 pb-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{review.name}</CardTitle>
+                        <CardDescription>{review.project}</CardDescription>
+                      </div>
+                      <Badge variant="default">Week {review.week}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6 flex-1 space-y-6">
+                    
+                    <div>
+                      <h4 className="text-sm font-semibold flex items-center mb-2">
+                        <FileText className="mr-2 h-4 w-4 text-primary-600" />
+                        Progress Summary
+                      </h4>
+                      <p className="text-sm bg-white dark:bg-navy-950 border rounded-md p-4 italic text-muted-foreground">
+                        &quot;{review.summary}&quot;
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold flex items-center mb-2">
+                        <GitBranch className="mr-2 h-4 w-4 text-primary-600" />
+                        Repository Link
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <Input readOnly value={review.github} className="font-mono text-xs bg-navy-50 dark:bg-navy-900" />
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={review.github} target="_blank" rel="noreferrer">Open</a>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold flex items-center mb-2">
+                        <MessageSquare className="mr-2 h-4 w-4 text-primary-600" />
+                        Mentor Feedback
+                      </h4>
+                      <textarea 
+                        className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-950" 
+                        placeholder="Provide constructive feedback on their progress..."
+                      ></textarea>
+                    </div>
+                    
+                  </CardContent>
+                  <CardFooter className="bg-navy-50 dark:bg-navy-900/50 border-t flex justify-between">
+                    <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setActiveReview(null)}>
+                      <X className="mr-2 h-4 w-4" /> Reject Report
+                    </Button>
+                    <Button variant="default" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setActiveReview(null)}>
+                      <Check className="mr-2 h-4 w-4" /> Approve Week {review.week}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )
+            })()
+          ) : (
+            <Card className="h-full flex flex-col items-center justify-center p-8 text-center border-dashed border-2">
+              <FileText className="h-12 w-12 text-navy-200 dark:text-navy-700 mb-4" />
+              <h3 className="text-lg font-semibold text-navy-900 dark:text-white mb-2">No Review Selected</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Select a pending weekly report from the list to review the summary, verify the code commit, and provide mentor feedback.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \tickets\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, Filter, MessageSquare, LifeBuoy, Send, Check, Loader2 } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function TicketsPage() {
+  const [activeTicket, setActiveTicket] = useState<any>(null)
+  const [replyMessage, setReplyMessage] = useState("")
+  const [isReplying, setIsReplying] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
+  
+  const { data, error, isLoading, mutate } = useSWR('/api/admin/tickets')
+
+  const tickets = data?.tickets || []
+
+  const handleReply = async () => {
+    if (!replyMessage.trim() || !activeTicket) return;
+    
+    setIsReplying(true);
+    try {
+      const res = await fetch('/api/admin/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ticketId: activeTicket.id, 
+          message: replyMessage,
+          status: 'IN_PROGRESS'
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      
+      toast.success('Reply sent successfully');
+      setReplyMessage("");
+      mutate();
+      // Update local active ticket view
+      setActiveTicket(result.ticket);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send reply');
+    } finally {
+      setIsReplying(false);
+    }
+  }
+
+  const handleResolve = async () => {
+    if (!activeTicket) return;
+    
+    setIsResolving(true);
+    try {
+      const res = await fetch('/api/admin/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ticketId: activeTicket.id, 
+          message: "Ticket has been marked as resolved by Administrator.",
+          status: 'RESOLVED'
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      
+      toast.success('Ticket marked as resolved');
+      mutate();
+      setActiveTicket(result.ticket);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resolve ticket');
+    } finally {
+      setIsResolving(false);
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case 'OPEN': return "destructive";
+      case 'IN_PROGRESS': return "warning";
+      case 'RESOLVED': return "success";
+      default: return "default";
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Support Tickets</h2>
+        <p className="text-muted-foreground">Manage and resolve intern inquiries and issues.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Ticket Queue</CardTitle>
+            <div className="flex gap-2 items-center pt-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search tickets..." className="pl-9 h-9" />
+              </div>
+              <Button variant="outline" size="icon" className="h-9 w-9"><Filter className="h-4 w-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-3">
+            <div className="space-y-2 h-[500px] overflow-y-auto">
+              {isLoading ? (
+                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : tickets.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">No tickets found.</div>
+              ) : (
+                tickets.map((ticket: any) => (
+                  <div 
+                    key={ticket.id} 
+                    className={`flex flex-col gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${activeTicket?.id === ticket.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'hover:bg-navy-50 dark:hover:bg-navy-900/50'}`}
+                    onClick={() => setActiveTicket(ticket)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-medium">{ticket.id.substring(0,8)}</span>
+                      </div>
+                      <Badge variant={getStatusColor(ticket.status) as any} className="text-[10px]">
+                        {ticket.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm truncate">{ticket.subject}</div>
+                      <div className="text-xs text-muted-foreground mt-1 flex justify-between">
+                        <span>{ticket.user.name}</span>
+                        <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3 flex flex-col h-[650px]">
+          {activeTicket ? (
+            <>
+              <CardHeader className="border-b">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{activeTicket.subject}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 mt-1">
+                      Reported by <span className="font-medium text-navy-900 dark:text-white">{activeTicket.user.name}</span>
+                      <span className="text-muted-foreground">•</span>
+                      {activeTicket.user.email}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={getStatusColor(activeTicket.status) as any}>{activeTicket.status.replace("_", " ")}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50 dark:bg-navy-950/50">
+                {activeTicket.messages.map((msg: any, i: number) => (
+                  <div key={msg.id} className={`flex flex-col ${msg.isFromAdmin ? 'items-end' : 'items-start'}`}>
+                    <div className="text-[10px] text-muted-foreground mb-1 ml-1">
+                      {msg.isFromAdmin ? 'Support Team' : activeTicket.user.name} • {new Date(msg.createdAt).toLocaleTimeString()}
+                    </div>
+                    <div className={`p-3 rounded-lg max-w-[85%] text-sm ${
+                      msg.isFromAdmin 
+                        ? 'bg-primary-600 text-white rounded-tr-none' 
+                        : 'bg-white dark:bg-navy-900 border rounded-tl-none'
+                    }`}>
+                      {msg.message}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+              <CardFooter className="border-t p-4 flex flex-col gap-3">
+                {activeTicket.status !== 'RESOLVED' ? (
+                  <>
+                    <div className="flex w-full items-center space-x-2">
+                      <Input 
+                        placeholder="Type your reply..." 
+                        value={replyMessage}
+                        onChange={(e) => setReplyMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleReply()}
+                      />
+                      <Button size="icon" onClick={handleReply} disabled={isReplying || !replyMessage.trim()}>
+                        {isReplying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <div className="flex w-full justify-between items-center">
+                      <p className="text-xs text-muted-foreground">Replying will update status to In Progress.</p>
+                      <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleResolve} disabled={isResolving}>
+                        {isResolving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />} Mark as Resolved
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full text-center text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                    This ticket has been marked as resolved and is now closed.
+                  </div>
+                )}
+              </CardFooter>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <LifeBuoy className="h-12 w-12 text-muted-foreground/30 mb-4" />
+              <p>Select a ticket from the queue to view details.</p>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \workspace\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Building, Copy, CheckCircle, Search, Mail, Loader2 } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function WorkspaceGenerationPage() {
+  const [loadingAppId, setLoadingAppId] = useState<string | null>(null)
+  const [generatedCreds, setGeneratedCreds] = useState<{email: string, password: string, template: string} | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const { data, error, isLoading, mutate } = useSWR('/api/admin/applicants?status=SELECTED')
+
+  const handleGenerate = async (appId: string) => {
+    setLoadingAppId(appId);
+    setGeneratedCreds(null);
+
+    try {
+      const res = await fetch('/api/admin/workspace/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: appId,
+          // Generate a default batch ID for now, in a real scenario you'd select this from a dropdown
+          batchId: 'cm0abcdef0000000000000000'
+        })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to generate workspace');
+      }
+
+      setGeneratedCreds(result.credentials);
+      toast.success('Workspace credentials generated successfully!');
+      
+      // Refresh the list to remove the applicant who is now 'JOINED'
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred');
+    } finally {
+      setLoadingAppId(null);
+    }
+  }
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
+  }
+
+  const applicants = data?.applicants || [];
+  
+  const filteredApplicants = applicants.filter((app: any) => 
+    app.user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    app.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Workspace Management</h2>
+        <p className="text-muted-foreground">Generate workspace credentials for applicants who passed the offline test.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Selected Applicants</CardTitle>
+            <CardDescription>Applicants pending workspace generation</CardDescription>
+            <div className="relative mt-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by name or email..." 
+                className="pl-9" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              </div>
+            ) : error ? (
+              <div className="text-red-500 text-sm p-4 text-center">Failed to load applicants</div>
+            ) : filteredApplicants.length === 0 ? (
+              <div className="text-muted-foreground text-sm p-8 text-center border rounded-lg border-dashed">
+                No pending applicants found. Make sure to mark applicants as &quot;SELECTED&quot; after they pass the test.
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                {filteredApplicants.map((app: any) => (
+                  <div key={app.id} className="flex flex-col gap-2 p-4 border rounded-lg hover:bg-navy-50 dark:hover:bg-navy-900/50 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-semibold text-sm">{app.user.name}</div>
+                        <div className="text-xs text-muted-foreground">{app.user.email}</div>
+                      </div>
+                      <Badge variant="outline">{app.status}</Badge>
+                    </div>
+                    
+                    <div className="text-xs mt-2 bg-white dark:bg-navy-950 p-2 rounded border">
+                      <span className="font-semibold">Internship:</span> {app.internship.title}
+                    </div>
+
+                    <Button 
+                      size="sm" 
+                      className="w-full mt-2" 
+                      onClick={() => handleGenerate(app.id)}
+                      disabled={loadingAppId !== null}
+                    >
+                      {loadingAppId === app.id ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
+                      ) : (
+                        <><Building className="h-4 w-4 mr-2" /> Generate Workspace</>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="h-fit sticky top-6">
+          <CardHeader>
+            <CardTitle>Generated Credentials</CardTitle>
+            <CardDescription>Share these credentials with the student</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {generatedCreds ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-green-900 dark:text-green-300">Account Ready!</h4>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                      The portal account has been successfully generated. The applicant&apos;s status is now &apos;JOINED&apos;.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">Login Email</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input readOnly value={generatedCreds.email} className="bg-muted/50 font-mono" />
+                      <Button variant="outline" size="icon" onClick={() => handleCopy(generatedCreds.email)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">Temporary Password</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input readOnly value={generatedCreds.password} className="bg-muted/50 font-mono" />
+                      <Button variant="outline" size="icon" onClick={() => handleCopy(generatedCreds.password)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center justify-between">
+                      Email Template
+                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleCopy(generatedCreds.template)}>
+                        <Copy className="h-3 w-3 mr-1" /> Copy All
+                      </Button>
+                    </label>
+                    <textarea 
+                      readOnly 
+                      value={generatedCreds.template} 
+                      className="mt-1 flex min-h-[200px] w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-mono shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                <Mail className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p>Select an applicant and click generate to view credentials here.</p>
+                <p className="text-xs mt-2 max-w-[250px]">
+                  Note: Since email delivery is skipped (per configuration), you must manually share these credentials with the student.
+                </p>
+              </div>
+            )}
+          </CardContent>
+          {generatedCreds && (
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={() => setGeneratedCreds(null)}>
+                Clear & Generate Another
+              </Button>
+            </CardFooter>
+          )}
+        </Card>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,215 @@
+.fc_primary{
+    color: $primay_color;
+}
+.fc_secondary{
+    color: $secondary_text;
+}
+.fc_secondary2{
+   color: $secondary_text2;
+}
+.fc_success {
+    color: $secondary_color;
+}
+.bg_light_green{
+    background-color: $title_strap_bg;
+}
+.bg_plain{
+    background-color: $plainBg;
+}
+
+.img_heading {
+    min-width: 250px;
+    position: relative;
+    width: fit-content;
+    font-weight: 600;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 4rem!important;
+    &::after{
+        content: '';
+        display: inline-block;
+        background-image: url(/assets/img/icon_img/heading_lines.svg);
+        background-repeat: no-repeat;
+        height: 20px;
+            width: 63%;
+        position: absolute;
+        right: 0;
+        bottom: -50%;
+        background-size: contain;
+        left: -50%;
+        right: -50%;
+        margin: auto;
+    }
+}
+
+.common_headers{
+    background-color: $title_strap_bg;
+    padding: 4rem 0;
+    background-image: url(../img/dummy_img/pattern_bg.svg);
+    background-size: cover;
+    background-repeat: no-repeat;
+    .img_heading{
+        margin-bottom: 0!important;
+    }
+}
+.commonPage_wrapper{
+    padding: 2.7rem 0;
+    background-color: $plainBg;
+}
+
+
+.btn-success{
+    background-color: $secondary_color;
+    &:hover{
+        border-color: $secondary_color;
+    }
+}
+.btn-outline-success{
+    background-color: $white_color;
+    color: $secondary_color;
+    &:hover{
+        background-color: $secondary_color;
+        color: $white_color;
+    }
+}
+
+
+.detail_card{
+    border-radius: $global_radius;
+    padding: 2.5rem;
+    padding: clamp(1.2rem, 2.7vw, 2.6rem);
+    @include global_shadow;
+}
+.common_para{
+    margin-bottom: 1.4rem;
+    p{
+        color: $secondary_text2;
+    }
+    ul{
+        li{
+            color: $secondary_text2;
+        }
+    }
+}
+
+.arrow_ul{
+    list-style-image: url('/assets/img/icon_img/green_arrow_icon.svg');
+    li{
+        margin-bottom: 0.5rem;
+    }
+}
+
+.accordion_with_bottom_border{
+    .accordion-item{
+        &:not(:last-child){
+            margin-bottom: 0 !important;
+        }
+                &:last-child {
+                    border-bottom: 0 !important;
+                }
+        border-top: none!important;
+        border-left: none !important;
+        border-right: none !important;
+        border-radius: 0!important;
+        .accordion-button{
+        border-radius: 0 !important;
+        }
+    }
+}
+
+.normal_list{
+    list-style-image: none;
+}
+
+.icon_small_heading {
+    margin-bottom: 1.5rem;
+    display: flex;
+    column-gap: 0.4rem;
+    align-items: center;
+    .icon_small_heading_icon{
+        &+*{
+            margin-bottom: 0;
+        }
+    }
+}
+.icon_small_heading_icon {
+    i{
+        color: $secondary_color;
+    }
+    padding: .4rem;
+    background-color: $title_strap_bg;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.3rem;
+    width: 2.3rem;
+    border-radius: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.1);;
+}
+
+.social_link_main{
+display: flex;
+flex-wrap: wrap;
+column-gap: .5rem;
+}
+.social_link_wrapper{
+display: flex;
+flex-wrap: wrap;
+column-gap: .6rem;
+a{
+    display: inline-block;
+    text-decoration: none;
+}
+.fab{
+        font-size: 1.3rem;
+}
+.fa-twitter{
+color: #43BDF0;
+}
+.fa-linkedin-in{
+  color: #2697CF;  
+}
+}
+
+.btn{
+    border-radius: .6rem;
+    padding-top: .55rem;
+    padding-bottom: .55rem;
+}
+.custom_radio_buttons{
+[type="radio"]{
+    display: none;
+&+label{
+padding: .6rem 1.6rem;
+border: 1px solid $primay_color;
+color: $primary_text;
+border-radius: 100px;
+line-height: initial;
+}
+&:checked{
+   &+label{
+  background-color: #CFD9F0;
+
+   }
+}
+} 
+}
+
+.custom_floating{
+  .input-group-text,.form-control{
+        padding: 1rem 0.75rem;
+  }
+  .input-group-text{
+    background-color: #D8F0CF;
+    color: $secondary_color;
+  }
+}
+
+.form_block {
+    margin-bottom: 1.6rem;
+}
+.plain_btn{
+    background-color: $plainBg;
+    padding: 1rem 1.7rem;
+    border-radius: 100px;
+}

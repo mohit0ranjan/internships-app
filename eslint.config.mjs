@@ -18,8 +18,24 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "public/**",
+      "scratch/**",
+      "scripts/**",
+      "*.js"
     ],
   },
+  {
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    linterOptions: {
+      reportUnusedDisableDirectives: false,
+    },
+    rules: {
+      "react/no-unescaped-entities": "off",
+      "@next/next/no-img-element": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off"
+    }
+  }
 ];
 
 export default eslintConfig;

@@ -1,0 +1,1155 @@
+
+
+--- FILE: \admin\applicants\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+export async function GET(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+    const internshipId = searchParams.get('internshipId');
+
+    const filter: Record<string, string> = {};
+    if (status) filter.status = status;
+    if (internshipId) filter.internshipId = internshipId;
+
+    const applicants = await prisma.application.findMany({
+      where: filter,
+      include: {
+        user: true,
+        internship: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return NextResponse.json({ success: true, applicants });
+  } catch (error) {
+    console.error('Applicants fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+const updateStatusSchema = z.object({
+  id: z.string().cuid(),
+  status: z.enum([
+    'SUBMITTED', 'SCREENING', 'INTERVIEW', 'SELECTED',
+    'REJECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'
+  ])
+});
+
+export async function PUT(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = updateStatusSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { id, status } = parsed.data;
+
+    const application = await prisma.application.update({
+      where: { id },
+      data: { status }
+    });
+
+    return NextResponse.json({ success: true, application });
+  } catch (error) {
+    console.error('Applicant update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \admin\batches\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const batches = await prisma.batch.findMany({
+      include: {
+        internship: true,
+        _count: {
+          select: { students: true }
+        }
+      },
+      orderBy: { startDate: 'desc' }
+    });
+
+    return NextResponse.json({ success: true, batches });
+  } catch (error) {
+    console.error('Batches fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \admin\certificates\generate\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { nanoid } from 'nanoid';
+import QRCode from 'qrcode';
+import { rateLimit } from '@/lib/rate-limit';
+import { certificateGenerateSchema } from '@/lib/validators';
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimitResponse = rateLimit(req, 10, 60 * 1000); // 10 per minute
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const body = await req.json();
+    const parsed = certificateGenerateSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { userId, internshipId } = parsed.data;
+
+    // Verify user and internship exist
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    // Check if certificate already exists
+    const existingCert = await prisma.certificate.findFirst({
+      where: { userId, internshipId }
+    });
+
+    if (existingCert) {
+      return NextResponse.json({ error: 'Certificate already exists for this internship' }, { status: 400 });
+    }
+
+    // Generate unique certificate number
+    const year = new Date().getFullYear();
+    const certNumber = `CSDAC-WBL-${year}-${nanoid(6).toUpperCase()}`;
+
+    // Generate QR Code data URL
+    const verifyUrl = `${process.env.NEXTAUTH_URL}/verify/${certNumber}`;
+    const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl);
+
+    // Create certificate record
+    const certificate = await prisma.certificate.create({
+      data: {
+        userId,
+        internshipId,
+        certificateNumber: certNumber,
+        issueDate: new Date(),
+        qrCode: qrCodeDataUrl,
+        status: 'ISSUED',
+        isVerified: true,
+        verifiedAt: new Date()
+      }
+    });
+
+    // Update application status
+    await prisma.application.updateMany({
+      where: { userId, internshipId },
+      data: { status: 'COMPLETED' }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Certificate generated successfully',
+      certificate
+    });
+
+  } catch (error: any) {
+    console.error('Certificate generation error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \admin\dashboard\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const totalStudents = await prisma.user.count({ where: { role: 'APPLICANT', isActive: true } });
+    const pendingApplications = await prisma.application.count({ where: { status: 'SUBMITTED' } });
+    
+    // Get today's attendance count
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayAttendance = await prisma.attendance.count({
+      where: { date: today, status: 'PRESENT' }
+    });
+    
+    const openTickets = await prisma.supportTicket.count({ where: { status: 'OPEN' } });
+
+    const recentApplications = await prisma.application.findMany({
+      take: 5,
+      include: { user: true, internship: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return NextResponse.json({
+      success: true,
+      stats: {
+        totalStudents,
+        pendingApplications,
+        todayAttendance,
+        openTickets,
+      },
+      recentApplications
+    });
+  } catch (error) {
+    console.error('Dashboard stats fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \admin\tickets\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+export async function GET(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+
+    const filter: Record<string, string> = {};
+    if (status) filter.status = status;
+
+    const tickets = await prisma.supportTicket.findMany({
+      where: filter,
+      include: {
+        user: true,
+        messages: {
+          orderBy: { timestamp: 'asc' },
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    const mappedTickets = tickets.map(ticket => ({
+      ...ticket,
+      messages: ticket.messages.map(msg => ({
+        ...msg,
+        message: msg.content,
+        createdAt: msg.timestamp,
+      }))
+    }));
+
+    return NextResponse.json({ success: true, tickets: mappedTickets });
+  } catch (error) {
+    console.error('Tickets fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+const replySchema = z.object({
+  ticketId: z.string().cuid(),
+  content: z.string().min(1),
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
+});
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = replySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { ticketId, content, status } = parsed.data;
+
+    // Create reply
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId,
+        senderId: session.user.id,
+        content,
+        isFromAdmin: true,
+      }
+    });
+
+    // Update ticket status and timestamp
+    const ticket = await prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: status || undefined,
+        updatedAt: new Date()
+      },
+      include: { messages: true }
+    });
+
+    return NextResponse.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Ticket reply error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \admin\workspace\create\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { nanoid } from 'nanoid';
+import { rateLimit } from '@/lib/rate-limit';
+import { workspaceCreateSchema } from '@/lib/validators';
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimitResponse = rateLimit(req, 10, 60 * 1000); // 10 per minute
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const body = await req.json();
+    const parsed = workspaceCreateSchema.safeParse(body);
+    
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { applicationId, batchId } = parsed.data;
+
+    // Get application and user
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { user: true, internship: true },
+    });
+
+    if (!application) {
+      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+    }
+
+    if (application.status !== 'OFFER_LETTER_SENT' && application.status !== 'SELECTED') {
+      return NextResponse.json({ error: 'Application must be SELECTED to generate a workspace' }, { status: 400 });
+    }
+
+    // Generate random password
+    const plainPassword = nanoid(10);
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    // Update user to active and set password
+    await prisma.user.update({
+      where: { id: application.userId },
+      data: {
+        password: hashedPassword,
+        isActive: true,
+        batches: {
+          connect: { id: batchId }
+        }
+      }
+    });
+
+    // Update application status to JOINED
+    await prisma.application.update({
+      where: { id: applicationId },
+      data: { status: 'JOINED' }
+    });
+
+    // Get email template
+    const template = await prisma.emailTemplate.findUnique({
+      where: { name: 'WORKSPACE_CREDENTIALS' }
+    });
+
+    let emailBody = template?.body || 'Your credentials are:\nEmail: {{email}}\nPassword: {{password}}';
+    emailBody = emailBody
+      .replace('{{name}}', application.user.name || 'Student')
+      .replace('{{email}}', application.user.email || '')
+      .replace('{{password}}', plainPassword)
+      .replace('{{loginUrl}}', `${process.env.NEXTAUTH_URL}/login`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Workspace account generated successfully',
+      credentials: {
+        email: application.user.email,
+        password: plainPassword,
+        emailTemplate: emailBody
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Workspace generation error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \auth\[...nextauth]\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { handlers } from '@/lib/auth';
+export const { GET, POST } = handlers;
+
+
+--- FILE: \health\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  try {
+    // Check DB connection
+    await prisma.$queryRaw`SELECT 1`;
+    
+    return NextResponse.json({ 
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      version: process.env.npm_package_version || '0.1.0'
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    return NextResponse.json({ 
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: 'Database connection failed'
+    }, { status: 503 });
+  }
+}
+
+
+--- FILE: \student\attendance\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    const attendance = await prisma.attendance.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: 10,
+    });
+
+    // Check if already checked in today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRecord = await prisma.attendance.findUnique({
+      where: {
+        userId_date: { userId, date: today },
+      },
+    });
+
+    // Calculate stats
+    const totalPresent = await prisma.attendance.count({
+      where: { userId, status: 'PRESENT' },
+    });
+
+    // Estimate enrolled days from the user's earliest attendance or application
+    const firstAttendance = await prisma.attendance.findFirst({
+      where: { userId },
+      orderBy: { date: 'asc' },
+    });
+
+    const totalDaysEnrolled = firstAttendance
+      ? Math.ceil((Date.now() - new Date(firstAttendance.date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 0;
+
+    const absent = Math.max(0, totalDaysEnrolled - totalPresent);
+    const percentage = totalDaysEnrolled > 0 ? Math.round((totalPresent / totalDaysEnrolled) * 100) : 0;
+
+    return NextResponse.json({
+      checkedInToday: !!todayRecord,
+      stats: {
+        totalDaysEnrolled,
+        present: totalPresent,
+        absent,
+        percentage,
+      },
+      history: attendance,
+    });
+  } catch (error) {
+    console.error('Attendance fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Prevent future attendance
+    const now = new Date();
+    if (today > now) {
+      return NextResponse.json({ error: 'Cannot mark future attendance' }, { status: 400 });
+    }
+
+    // Check if already checked in today (prevent duplicates)
+    const existing = await prisma.attendance.findUnique({
+      where: {
+        userId_date: {
+          userId: session.user.id,
+          date: today,
+        },
+      },
+    });
+
+    if (existing) {
+      return NextResponse.json({ error: 'Already checked in today' }, { status: 400 });
+    }
+
+    const attendance = await prisma.attendance.create({
+      data: {
+        userId: session.user.id,
+        date: today,
+        status: 'PRESENT',
+        checkInTime: new Date(),
+      },
+    });
+
+    return NextResponse.json({ success: true, attendance });
+  } catch (error) {
+    console.error('Attendance check-in error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\certificate\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // Get active application
+    const application = await prisma.application.findFirst({
+      where: { userId, status: { in: ['JOINED', 'COMPLETED'] } },
+      include: {
+        internship: true,
+        project: true,
+        user: { select: { name: true } }
+      }
+    });
+
+    // Attendance stats
+    const presentCount = await prisma.attendance.count({
+      where: { userId, status: 'PRESENT' }
+    });
+
+    const firstAttendance = await prisma.attendance.findFirst({
+      where: { userId },
+      orderBy: { date: 'asc' },
+    });
+
+    const totalDays = firstAttendance
+      ? Math.ceil((Date.now() - new Date(firstAttendance.date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 0;
+    const percentage = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0;
+
+    // Progress count
+    let progressCount = 0;
+    if (application?.projectId) {
+      progressCount = await prisma.weeklyProgress.count({
+        where: { userId, projectId: application.projectId }
+      });
+    }
+
+    // Certificate
+    const certificate = application ? await prisma.certificate.findFirst({
+      where: { userId, internshipId: application.internshipId }
+    }) : null;
+
+    return NextResponse.json({
+      application,
+      attendance: { percentage, count: presentCount },
+      progress: { count: progressCount },
+      certificate,
+    });
+  } catch (error) {
+    console.error('Certificate page data error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\dashboard\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // Get active application/internship
+    const application = await prisma.application.findFirst({
+      where: { 
+        userId,
+        status: { in: ['JOINED', 'COMPLETED'] }
+      },
+      include: { 
+        internship: true,
+        project: true,
+        user: { select: { name: true, email: true } }
+      }
+    });
+
+    if (!application) {
+      return NextResponse.json({ application: null, attendanceCount: 0, progressCount: 0, certificate: null });
+    }
+
+    // Get attendance count (safe)
+    const attendanceCount = await prisma.attendance.count({
+      where: { userId, status: 'PRESENT' }
+    });
+
+    // Get progress count (safe — guard against null projectId)
+    let progressCount = 0;
+    if (application.projectId) {
+      progressCount = await prisma.weeklyProgress.count({
+        where: { userId, projectId: application.projectId }
+      });
+    }
+
+    // Get certificate status
+    const certificate = await prisma.certificate.findFirst({
+      where: { userId, internshipId: application.internshipId }
+    });
+
+    return NextResponse.json({
+      application,
+      attendanceCount,
+      progressCount,
+      certificate,
+    });
+  } catch (error) {
+    console.error('Dashboard fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\profile\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        college: true,
+        degree: true,
+        branch: true,
+        year: true,
+        image: true,
+      }
+    });
+
+    return NextResponse.json({ success: true, user });
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+const updateProfileSchema = z.object({
+  name: z.string().min(2),
+  phone: z.string().optional(),
+  college: z.string().optional(),
+  degree: z.string().optional(),
+  branch: z.string().optional(),
+  year: z.string().optional(),
+});
+
+export async function PUT(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = updateProfileSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: session.user.id },
+      data: parsed.data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        college: true,
+        degree: true,
+        branch: true,
+        year: true,
+      }
+    });
+
+    return NextResponse.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\progress\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const submitProgressSchema = z.object({
+  weekNumber: z.number().int().min(1).max(24),
+  summary: z.string().min(10, 'Summary must be at least 10 characters').max(2000),
+  githubUrl: z.string().url().optional().or(z.literal('')),
+});
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // Auto-detect project from user's active application
+    const application = await prisma.application.findFirst({
+      where: { userId, status: { in: ['JOINED', 'COMPLETED'] } },
+      include: { project: true }
+    });
+
+    if (!application?.projectId) {
+      return NextResponse.json({ progress: [], currentWeek: 1 });
+    }
+
+    const progress = await prisma.weeklyProgress.findMany({
+      where: { userId, projectId: application.projectId },
+      orderBy: { weekNumber: 'desc' },
+    });
+
+    // Calculate current week based on submissions
+    const currentWeek = progress.length > 0 ? progress[0].weekNumber + 1 : 1;
+
+    return NextResponse.json({ progress, currentWeek });
+  } catch (error) {
+    console.error('Progress fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = submitProgressSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { weekNumber, summary, githubUrl } = parsed.data;
+
+    // Auto-detect projectId from user's application
+    const application = await prisma.application.findFirst({
+      where: { userId: session.user.id, status: { in: ['JOINED', 'COMPLETED'] } },
+    });
+
+    if (!application?.projectId) {
+      return NextResponse.json({ error: 'No project assigned. Cannot submit progress.' }, { status: 400 });
+    }
+
+    // Check if already submitted for this week (prevent duplicates)
+    const existing = await prisma.weeklyProgress.findUnique({
+      where: {
+        userId_projectId_weekNumber: {
+          userId: session.user.id,
+          projectId: application.projectId,
+          weekNumber,
+        },
+      },
+    });
+
+    if (existing) {
+      return NextResponse.json({ error: 'Progress already submitted for this week' }, { status: 400 });
+    }
+
+    const progress = await prisma.weeklyProgress.create({
+      data: {
+        userId: session.user.id,
+        projectId: application.projectId,
+        weekNumber,
+        summary,
+        githubLink: githubUrl || null,
+        status: 'SUBMITTED',
+      },
+    });
+
+    return NextResponse.json({ success: true, progress });
+  } catch (error) {
+    console.error('Progress submission error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\project\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const updateProjectSchema = z.object({
+  githubUrl: z.string().url().optional().or(z.literal('')),
+  liveUrl: z.string().url().optional().or(z.literal('')),
+});
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const application = await prisma.application.findFirst({
+      where: { 
+        userId: session.user.id,
+        status: { in: ['JOINED', 'COMPLETED'] }
+      },
+      include: { 
+        project: true,
+        internship: { select: { title: true, domain: true, centre: true, duration: true } }
+      }
+    });
+
+    if (!application || !application.project) {
+      return NextResponse.json({ internship: application?.internship || null, project: null, mentor: null });
+    }
+
+    // Build mentor info from project
+    const mentor = application.project.mentorName ? {
+      name: application.project.mentorName,
+      email: application.project.mentorEmail || '',
+    } : null;
+
+    return NextResponse.json({ 
+      internship: application.internship,
+      project: {
+        ...application.project,
+        // Map githubRepoUrl to githubUrl for frontend
+        githubUrl: application.project.githubRepoUrl,
+        liveUrl: null, // Project model doesn't have liveUrl yet
+      },
+      mentor,
+    });
+  } catch (error) {
+    console.error('Project fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = updateProjectSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { githubUrl, liveUrl } = parsed.data;
+
+    // Auto-detect project from user's application (ownership verification)
+    const application = await prisma.application.findFirst({
+      where: {
+        userId: session.user.id,
+        status: { in: ['JOINED', 'COMPLETED'] },
+        projectId: { not: null }
+      }
+    });
+
+    if (!application?.projectId) {
+      return NextResponse.json({ error: 'No project assigned' }, { status: 404 });
+    }
+
+    const project = await prisma.project.update({
+      where: { id: application.projectId },
+      data: {
+        githubRepoUrl: githubUrl || null,
+        // liveUrl is not in schema yet, so we skip it
+      }
+    });
+
+    return NextResponse.json({ success: true, project });
+  } catch (error) {
+    console.error('Project update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \student\support\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+
+const createTicketSchema = z.object({
+  subject: z.string().min(5).max(100),
+  message: z.string().min(10).max(2000),
+  category: z.enum(['GENERAL', 'TECHNICAL', 'PAYMENT', 'CERTIFICATE', 'MENTORSHIP']).optional().default('GENERAL'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().default('MEDIUM'),
+});
+
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const tickets = await prisma.supportTicket.findMany({
+      where: { userId: session.user.id },
+      include: {
+        messages: {
+          orderBy: { timestamp: 'asc' },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    // Map messages to include isFromAdmin and rename content→message for frontend
+    const mappedTickets = tickets.map(ticket => ({
+      ...ticket,
+      messages: ticket.messages.map(msg => ({
+        id: msg.id,
+        message: msg.content,
+        isFromAdmin: msg.isFromAdmin,
+        createdAt: msg.timestamp,
+      })),
+    }));
+
+    return NextResponse.json({ tickets: mappedTickets });
+  } catch (error) {
+    console.error('Tickets fetch error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'APPLICANT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const parsed = createTicketSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { subject, category, priority, message } = parsed.data;
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        userId: session.user.id,
+        subject,
+        category,
+        priority,
+        messages: {
+          create: {
+            senderId: session.user.id,
+            content: message,
+            isFromAdmin: false,
+          }
+        }
+      },
+      include: { messages: true }
+    });
+
+    return NextResponse.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Ticket creation error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+
+--- FILE: \verify\[certNumber]\route.ts ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { prisma } from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ certNumber: string }> }
+) {
+  try {
+    const { certNumber } = await params;
+    
+    if (!certNumber) {
+      return NextResponse.json({ error: 'Certificate number required' }, { status: 400 });
+    }
+
+    const certificate = await prisma.certificate.findUnique({
+      where: { certificateNumber: certNumber },
+      include: {
+        user: {
+          select: { name: true, college: true, degree: true }
+        },
+        internship: {
+          select: { title: true, domain: true, centre: true, duration: true }
+        }
+      }
+    });
+
+    if (!certificate || certificate.status === 'REVOKED') {
+      return NextResponse.json({ 
+        valid: false, 
+        message: 'Invalid or revoked certificate' 
+      }, { status: 404 });
+    }
+
+    return NextResponse.json({ 
+      valid: true, 
+      certificate: {
+        certificateNumber: certificate.certificateNumber,
+        issueDate: certificate.issueDate,
+        studentName: certificate.user.name,
+        college: certificate.user.college,
+        degree: certificate.user.degree,
+        internshipTitle: certificate.internship.title,
+        domain: certificate.internship.domain,
+        centre: certificate.internship.centre,
+        duration: certificate.internship.duration,
+      }
+    });
+  } catch (error) {
+    console.error('Certificate verification error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

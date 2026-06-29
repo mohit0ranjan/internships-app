@@ -1,0 +1,19 @@
+
+@import "variable";
+@import "mixin";
+@import "helpers";
+@import "footer";
+@import "header";
+@import "custom";
+@import "responsive";
+
+@font-face {
+font-family: 'Axiforma';
+    src: url("/assets/fonts/Axiforma-Medium.ttf")format('truetype'),
+    url('/assets/fonts/Axiforma-Light.ttf') format('truetype'),
+    url('/assets/fonts/Axiforma-SemiBold.ttf') format('truetype'),;
+}
+body,html{
+    font-size: 14px;
+    font-family: 'Axiforma';
+}

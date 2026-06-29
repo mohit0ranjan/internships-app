@@ -1,0 +1,1186 @@
+
+
+--- FILE: \attendance\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { CheckCircle, XCircle, Clock, Calendar as CalendarIcon, Loader2 } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function AttendancePage() {
+  const [time, setTime] = useState<Date | null>(null)
+  const [isCheckingIn, setIsCheckingIn] = useState(false)
+
+  const { data, error, isLoading, mutate } = useSWR('/api/student/attendance')
+
+  useEffect(() => {
+    setTime(new Date())
+    const interval = setInterval(() => {
+      setTime(new Date())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleCheckIn = async () => {
+    setIsCheckingIn(true)
+    try {
+      const res = await fetch('/api/student/attendance', { method: 'POST' })
+      const result = await res.json()
+      
+      if (!res.ok) throw new Error(result.error || 'Failed to mark attendance')
+      
+      toast.success('Attendance marked successfully!')
+      mutate() // Refresh data
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred')
+    } finally {
+      setIsCheckingIn(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Attendance</h2>
+        <p className="text-muted-foreground">Track your daily presence and check-in times.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Mark Attendance</CardTitle>
+            <CardDescription>Record today&apos;s presence</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-6 space-y-4">
+            <div className="text-4xl font-bold text-navy-900 dark:text-white tabular-nums">
+              {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {time ? time.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '...'}
+            </p>
+            
+            {data?.checkedInToday ? (
+              <div className="w-full mt-4 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-lg flex items-center justify-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-semibold">Marked Present Today</span>
+              </div>
+            ) : (
+              <Button size="lg" className="w-full mt-4" onClick={handleCheckIn} disabled={isCheckingIn || isLoading}>
+                {isCheckingIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle className="mr-2 h-5 w-5" />}
+                Check In
+              </Button>
+            )}
+            
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Attendance records your timestamp in Indian Standard Time (IST).
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Attendance Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>
+            ) : error ? (
+              <div className="text-red-500">Failed to load statistics.</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-navy-950 border text-center">
+                    <div className="text-2xl font-bold">{data?.stats?.totalDaysEnrolled || 0}</div>
+                    <div className="text-xs text-muted-foreground">Days Enrolled</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 text-center">
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-400">{data?.stats?.present || 0}</div>
+                    <div className="text-xs text-green-600 dark:text-green-500">Present</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-center">
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-400">{data?.stats?.absent || 0}</div>
+                    <div className="text-xs text-red-600 dark:text-red-500">Absent</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-primary-50 dark:bg-primary-950 border border-primary-100 dark:border-primary-900 text-center">
+                    <div className="text-2xl font-bold text-primary-700 dark:text-primary-400">{data?.stats?.percentage || 0}%</div>
+                    <div className="text-xs text-primary-600 dark:text-primary-500">Percentage</div>
+                  </div>
+                </div>
+
+                <div className="w-full bg-slate-100 dark:bg-navy-900 rounded-full h-2.5 mb-2">
+                  <div 
+                    className={`h-2.5 rounded-full ${((data?.stats?.percentage || 0) >= 75) ? 'bg-green-600' : 'bg-red-600'}`} 
+                    style={{ width: `${data?.stats?.percentage || 0}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Minimum 75% attendance is required for certificate generation.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent History</CardTitle>
+          <CardDescription>Your last 10 attendance records</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-0 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent dark:before:via-slate-700">
+            {isLoading ? (
+              <div className="flex justify-center p-4 relative z-10 bg-white dark:bg-navy-900"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : data?.history?.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8 relative z-10 bg-white dark:bg-navy-900">No attendance records found.</div>
+            ) : (
+              data?.history?.map((record: any, index: number) => (
+                <div key={record.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active py-4">
+                  
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white dark:border-navy-900 bg-green-100 text-green-600 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-lg border bg-white dark:bg-navy-950 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="font-semibold text-navy-900 dark:text-white flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        {new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </div>
+                      <Badge variant="success" className="text-[10px]">PRESENT</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-4 mt-2">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Check In: {new Date(record.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+
+--- FILE: \certificate\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Award, Download, CheckCircle, Clock, ExternalLink, Loader2, XCircle } from "lucide-react";
+import Link from "next/link";
+import useSWR from "swr";
+
+export default function CertificatePage() {
+  const { data, error, isLoading } = useSWR('/api/student/certificate');
+
+  if (isLoading) {
+    return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>
+  }
+
+  if (error || !data) {
+    return <div className="text-red-500 text-center py-10">Failed to load certificate details.</div>
+  }
+
+  const { application, attendance, progress, certificate } = data;
+
+  const isAttendanceMet = attendance?.percentage >= 75;
+  const isProgressMet = progress?.count >= 4; // Assuming 4 is minimum required
+  const isProjectMet = application?.project?.githubUrl ? true : false;
+  
+  const isEligible = isAttendanceMet && isProgressMet && isProjectMet && application?.status === 'COMPLETED';
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Internship Certificate</h2>
+        <p className="text-muted-foreground">Track your eligibility and download your verifiable completion certificate.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Eligibility Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <span className="text-sm">Attendance &gt; 75% ({attendance?.percentage || 0}%)</span>
+                {isAttendanceMet ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="flex items-center justify-between border-b pb-3">
+                <span className="text-sm">Weekly Reports ({progress?.count || 0})</span>
+                {isProgressMet ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="flex items-center justify-between border-b pb-3">
+                <span className="text-sm">Final Project Submission</span>
+                {isProjectMet ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="flex items-center justify-between border-b pb-3">
+                <span className="text-sm">Internship Completed</span>
+                {application?.status === 'COMPLETED' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Overall Status</span>
+                {certificate ? (
+                  <Badge variant="success">Issued</Badge>
+                ) : isEligible ? (
+                  <Badge variant="warning">Awaiting Issue</Badge>
+                ) : (
+                  <Badge variant="outline">In Progress</Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Verification</CardTitle>
+              <CardDescription>Your certificate is publicly verifiable.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-4">
+              <p>
+                Every certificate issued by CSDAC contains a unique cryptographic QR code and ID number.
+              </p>
+              <p>
+                Employers and institutions can scan the QR code or enter the ID at <span className="font-semibold text-navy-900 dark:text-white">internships.csdac.in/verify</span> to instantly verify its authenticity.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {certificate ? (
+            <Card className="h-full border-primary-200 dark:border-primary-900 shadow-md">
+              <CardHeader className="text-center pb-2 bg-gradient-to-r from-primary-50 to-transparent dark:from-primary-950">
+                <Award className="h-12 w-12 text-primary-600 mx-auto mb-2" />
+                <CardTitle className="text-2xl text-primary-900 dark:text-primary-100">Certificate of Completion</CardTitle>
+                <CardDescription>Issued on {new Date(certificate.issueDate).toLocaleDateString()}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="bg-white dark:bg-navy-900 border rounded-lg p-6 shadow-sm relative overflow-hidden">
+                  {/* Decorative Elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary-50 dark:bg-primary-900/20 rounded-bl-full -mr-16 -mt-16 z-0"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-accent-50 dark:bg-accent-900/20 rounded-tr-full -ml-12 -mb-12 z-0"></div>
+                  
+                  <div className="relative z-10 text-center space-y-4">
+                    <div className="text-sm font-semibold tracking-widest text-muted-foreground uppercase">Certificate ID</div>
+                    <div className="font-mono bg-muted inline-block px-3 py-1 rounded text-sm">{certificate.certificateNumber}</div>
+                    
+                    <div className="pt-4">
+                      <p className="text-sm text-muted-foreground mb-1">This is to certify that</p>
+                      <h3 className="text-2xl font-serif font-bold text-navy-900 dark:text-white">{application?.user?.name}</h3>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm text-muted-foreground mt-4 mb-1">has successfully completed the Work-Based Learning Internship in</p>
+                      <h4 className="text-lg font-semibold text-primary-700 dark:text-primary-400">{application?.internship?.domain}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Grade: <span className="font-bold text-navy-900 dark:text-white">{certificate.grade}</span></p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-center gap-4 bg-muted/30 pt-6">
+                <Button className="w-full sm:w-auto">
+                  <Download className="mr-2 h-4 w-4" /> Download PDF
+                </Button>
+                <Button variant="outline" className="w-full sm:w-auto" asChild>
+                  <Link href={`/verify/${certificate.certificateNumber}`} target="_blank">
+                    <ExternalLink className="mr-2 h-4 w-4" /> View Public Link
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-navy-950 border-dashed">
+              <Clock className="h-16 w-16 text-muted-foreground/30 mb-4" />
+              <h3 className="text-xl font-bold text-navy-900 dark:text-white mb-2">Certificate Not Ready</h3>
+              <p className="text-muted-foreground max-w-md">
+                Your certificate will be generated and available for download here once you meet all eligibility criteria and your final project is evaluated by your mentor.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \layout.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  CheckSquare, 
+  Award, 
+  LifeBuoy, 
+  User, 
+  LogOut,
+  Bell
+} from "lucide-react";
+
+export default async function StudentLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await auth();
+
+  if (!session || !session.user || session.user.role !== "APPLICANT") {
+    redirect("/login");
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col md:flex-row bg-navy-50 dark:bg-navy-950">
+      {/* Sidebar */}
+      <aside className="w-full md:w-64 bg-white dark:bg-navy-900 border-r border-navy-100 dark:border-navy-800 flex-shrink-0">
+        <div className="h-16 flex items-center px-6 border-b border-navy-100 dark:border-navy-800">
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/assets/img/cdacLogo.png" alt="CSDAC" className="h-8 w-8" />
+            <span className="font-bold text-navy-900 dark:text-white">Workspace</span>
+          </Link>
+        </div>
+        
+        <div className="p-4">
+          <div className="mb-4 px-2 py-2">
+            <p className="text-sm font-medium text-navy-900 dark:text-white truncate">
+              {session.user?.name}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {session.user?.email}
+            </p>
+          </div>
+          
+          <nav className="space-y-1">
+            <Link href="/student" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </Link>
+            <Link href="/student/internship" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <Briefcase className="h-4 w-4" /> Internship Details
+            </Link>
+            <Link href="/student/attendance" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <CheckSquare className="h-4 w-4" /> Attendance
+            </Link>
+            <Link href="/student/progress" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <CheckSquare className="h-4 w-4" /> Weekly Progress
+            </Link>
+            <Link href="/student/certificate" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <Award className="h-4 w-4" /> Certificate
+            </Link>
+            <Link href="/student/support" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <LifeBuoy className="h-4 w-4" /> Support
+            </Link>
+            <Link href="/student/profile" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-primary-50 hover:text-primary-900 dark:hover:bg-primary-900/30 dark:hover:text-primary-100">
+              <User className="h-4 w-4" /> Profile
+            </Link>
+            <form action="/api/auth/signout" method="POST">
+              <button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30">
+                <LogOut className="h-4 w-4" /> Sign Out
+              </button>
+            </form>
+          </nav>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="h-16 flex items-center justify-between px-6 bg-white dark:bg-navy-900 border-b border-navy-100 dark:border-navy-800">
+          <h1 className="text-lg font-semibold text-navy-900 dark:text-white">Student Workspace</h1>
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 text-navy-400 hover:text-navy-900 dark:hover:text-white">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500"></span>
+            </button>
+          </div>
+        </header>
+        <div className="flex-1 overflow-auto p-6">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+
+--- FILE: \page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Clock, CheckCircle, FileText, ArrowRight, Loader2, PlayCircle, Lock } from "lucide-react";
+import Link from "next/link";
+import useSWR from "swr";
+
+export default function StudentDashboard() {
+  const { data, error, isLoading } = useSWR('/api/student/dashboard');
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">Welcome back to your internship workspace.</p>
+        </div>
+        <Button className="md:self-end" asChild>
+          <Link href="/student/attendance">
+            Mark Today&apos;s Attendance
+          </Link>
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        </div>
+      ) : error ? (
+        <div className="p-4 bg-red-50 text-red-600 rounded-md">Failed to load dashboard data.</div>
+      ) : (
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Internship Status</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data?.application?.status?.replace('_', ' ') || 'ACTIVE'}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enrolled in {data?.application?.internship?.domain}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data?.attendanceCount || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Days Present
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Weekly Reports</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data?.progressCount || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Submitted so far
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Certificate</CardTitle>
+                {data?.certificate ? (
+                  <Badge variant="success" className="text-xs">Generated</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs">Pending</Badge>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm font-medium mt-2">
+                  {data?.certificate ? 'Ready to download' : 'Complete 6 weeks to unlock'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {data?.certificate ? data.certificate.certificateNumber : 'Requirements not met'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="col-span-1">
+              <CardHeader>
+                <CardTitle>Current Project Details</CardTitle>
+                <CardDescription>Your assigned live government project.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-1">Project Title</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {data?.application?.project?.title || 'Not Assigned Yet'}
+                    </p>
+                  </div>
+                  {data?.application?.project && (
+                    <>
+                      <div>
+                        <h4 className="text-sm font-semibold mb-1">Description</h4>
+                        <p className="text-sm text-muted-foreground line-clamp-3">
+                          {data?.application?.project?.description}
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold mb-1">Tech Stack</h4>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {data?.application?.project?.techStack ? 
+                            JSON.parse(data?.application?.project?.techStack).map((tech: string, i: number) => (
+                              <Badge key={i} variant="secondary">{tech}</Badge>
+                            ))
+                            : <span className="text-sm text-muted-foreground">Not specified</span>
+                          }
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <Button variant="outline" className="w-full mt-4" asChild>
+                    <Link href="/student/project">
+                      Manage Project Workspace <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="col-span-1 border-primary-200 dark:border-primary-900 bg-primary-50/50 dark:bg-primary-950/20">
+              <CardHeader>
+                <CardTitle className="text-primary-900 dark:text-primary-100">Learning Resources</CardTitle>
+                <CardDescription>Curated materials for your domain.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-4 p-3 bg-white dark:bg-navy-900 rounded-lg border">
+                  <PlayCircle className="h-8 w-8 text-primary-500 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-semibold">Orientation Video</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Introduction to CSDAC Work-Based Learning.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-3 bg-white dark:bg-navy-900 rounded-lg border">
+                  <FileText className="h-8 w-8 text-primary-500 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-semibold">Coding Guidelines</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Standard practices for live project contributions.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-3 bg-white dark:bg-navy-900 rounded-lg border opacity-70">
+                  <Lock className="h-8 w-8 text-muted-foreground shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-semibold">Advanced Modules</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Unlocks after Week 2.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+--- FILE: \progress\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { FileText, GitBranch, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function ProgressPage() {
+  const [githubUrl, setGithubUrl] = useState("")
+  const [summary, setSummary] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const { data, error, isLoading, mutate } = useSWR('/api/student/progress')
+
+  const currentWeek = data?.currentWeek || 1;
+  const submissions = data?.progress || [];
+
+  const handleSubmit = async () => {
+    if (!summary.trim()) {
+      toast.error('Please provide a progress summary');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/student/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekNumber: currentWeek,
+          githubUrl: githubUrl.trim() || undefined,
+          summary: summary.trim()
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to submit report');
+      
+      toast.success(`Week ${currentWeek} report submitted successfully`);
+      setGithubUrl("");
+      setSummary("");
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case 'SUBMITTED': return 'default';
+      case 'REVIEWED': return 'success';
+      case 'NEEDS_REVISION': return 'destructive';
+      default: return 'outline';
+    }
+  }
+
+  // Find if current week is already submitted
+  const hasSubmittedCurrentWeek = submissions.some((sub: any) => sub.weekNumber === currentWeek);
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Weekly Progress</h2>
+        <p className="text-muted-foreground">Submit your weekly reports and GitHub repository links.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Submit Week {currentWeek} Report</CardTitle>
+            <CardDescription>Submit your progress for the current week</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : hasSubmittedCurrentWeek ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-900">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mb-2" />
+                <h3 className="font-semibold text-green-800 dark:text-green-300">Report Submitted</h3>
+                <p className="text-sm text-green-700 dark:text-green-400 mt-1">You have already submitted your report for Week {currentWeek}. Next week will unlock on Monday.</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">GitHub Commit Link (Optional)</label>
+                  <div className="flex relative">
+                    <GitBranch className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="https://github.com/username/repo/commit/..." 
+                      className="pl-9" 
+                      value={githubUrl}
+                      onChange={(e) => setGithubUrl(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Link to the specific commit or PR for this week&apos;s work.</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Progress Summary <span className="text-red-500">*</span></label>
+                  <textarea 
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-950 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-primary-300" 
+                    placeholder="Briefly describe what you accomplished this week, challenges faced, and what you plan to do next week..."
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                  ></textarea>
+                </div>
+              </>
+            )}
+          </CardContent>
+          {!hasSubmittedCurrentWeek && !isLoading && (
+            <CardFooter>
+              <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !summary.trim()}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Submit Weekly Report
+              </Button>
+            </CardFooter>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Submission History</CardTitle>
+            <CardDescription>Past reports and mentor remarks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+              {isLoading ? (
+                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : submissions.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">No past submissions found.</div>
+              ) : (
+                submissions.map((sub: any) => (
+                  <div key={sub.id} className="flex flex-col gap-2 p-4 border rounded-lg bg-navy-50/50 dark:bg-navy-900/30">
+                    <div className="flex justify-between items-start">
+                      <div className="font-semibold text-sm">Week {sub.weekNumber}</div>
+                      <Badge variant={getStatusColor(sub.status) as any} className="text-[10px]">
+                        {sub.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">Submitted: {new Date(sub.createdAt).toLocaleDateString()}</div>
+                    <div className="text-sm mt-2 line-clamp-2 text-navy-800 dark:text-navy-100">{sub.summary}</div>
+                    
+                    {sub.githubUrl && (
+                      <div className="mt-2 text-xs flex items-center gap-1 text-primary-600 dark:text-primary-400">
+                        <GitBranch className="h-3 w-3" />
+                        <a href={sub.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                          {sub.githubUrl}
+                        </a>
+                      </div>
+                    )}
+
+                    {sub.remarks && (
+                      <div className="mt-3 p-3 bg-white dark:bg-navy-950 rounded border text-sm">
+                        <span className="font-semibold text-xs text-muted-foreground mb-1 block">Mentor Remarks:</span>
+                        {sub.remarks}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \project\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Briefcase, Link as LinkIcon, GitBranch, Globe, Server, CheckCircle2, Loader2, Save } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function ProjectPage() {
+  const { data, error, isLoading, mutate } = useSWR('/api/student/project')
+  
+  const [githubUrl, setGithubUrl] = useState("")
+  const [liveUrl, setLiveUrl] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Sync state with data when it loads
+  if (data?.project && !isEditing && (githubUrl === "" && liveUrl === "")) {
+    if (data.project.githubUrl) setGithubUrl(data.project.githubUrl)
+    if (data.project.liveUrl) setLiveUrl(data.project.liveUrl)
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/student/project', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          githubUrl: githubUrl.trim() || undefined, 
+          liveUrl: liveUrl.trim() || undefined 
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      
+      toast.success('Project URLs saved successfully');
+      setIsEditing(false);
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save project URLs');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading) {
+    return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>
+  }
+
+  if (error || !data) {
+    return <div className="text-red-500 text-center py-10">Failed to load project details.</div>
+  }
+
+  const { internship, project } = data;
+
+  if (!project) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Assigned Project</h2>
+          <p className="text-muted-foreground">Details and submission links for your work-based learning project.</p>
+        </div>
+        <Card className="text-center py-12">
+          <CardContent>
+            <Briefcase className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold">No Project Assigned Yet</h3>
+            <p className="text-muted-foreground mt-2 max-w-sm mx-auto">Your mentor will assign you a live project shortly. Check back later.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const techStack = project.techStack ? JSON.parse(project.techStack) : [];
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Assigned Project</h2>
+        <p className="text-muted-foreground">Details and submission links for your work-based learning project.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-6">
+          <Card>
+            <CardHeader className="pb-4 border-b">
+              <div className="flex justify-between items-start">
+                <div>
+                  <Badge className="mb-2 bg-primary-100 text-primary-900 hover:bg-primary-200 dark:bg-primary-900 dark:text-primary-100">{internship?.domain || 'General'}</Badge>
+                  <CardTitle className="text-xl">{project.title}</CardTitle>
+                </div>
+                <Badge variant="success">Active</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Project Description</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {project.description}
+                </p>
+              </div>
+              
+              {techStack.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Required Tech Stack</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {techStack.map((tech: string, i: number) => (
+                      <Badge key={i} variant="secondary">{tech}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Project Repository & URLs</CardTitle>
+                  <CardDescription>Update your project links here.</CardDescription>
+                </div>
+                {!isEditing && (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>Edit Links</Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">GitHub Repository URL <span className="text-red-500">*</span></label>
+                <div className="flex relative">
+                  <GitBranch className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="https://github.com/username/repo" 
+                    className="pl-9" 
+                    disabled={!isEditing}
+                    value={githubUrl}
+                    onChange={(e) => setGithubUrl(e.target.value)}
+                  />
+                </div>
+                {isEditing && <p className="text-xs text-muted-foreground">Make sure the repository is public or you have invited your mentor.</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Live Deployment URL (Optional)</label>
+                <div className="flex relative">
+                  <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="https://my-project.vercel.app" 
+                    className="pl-9" 
+                    disabled={!isEditing}
+                    value={liveUrl}
+                    onChange={(e) => setLiveUrl(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+            {isEditing && (
+              <CardFooter className="flex justify-end gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => {
+                  setIsEditing(false);
+                  setGithubUrl(project.githubUrl || "");
+                  setLiveUrl(project.liveUrl || "");
+                }}>Cancel</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save Changes
+                </Button>
+              </CardFooter>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Mentor Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {data?.mentor ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-900 font-bold uppercase">
+                    {data.mentor.name.substring(0,2)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">{data.mentor.name}</div>
+                    <div className="text-xs text-muted-foreground">Technical Lead</div>
+                    <a href={`mailto:${data.mentor.email}`} className="text-xs text-primary-600 hover:underline mt-1 block">
+                      {data.mentor.email}
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Mentor not assigned yet.</div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-900">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-semibold text-primary-900 dark:text-primary-100">Submission Guidelines</h4>
+                  <p className="text-xs text-primary-800/80 dark:text-primary-200 mt-2 space-y-1">
+                    • Code must be pushed to the main branch.<br/>
+                    • Include a detailed README.md file.<br/>
+                    • Ensure API keys are NOT hardcoded.<br/>
+                    • The final evaluation will be based on the latest commit.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+--- FILE: \support\page.tsx ---
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useState } from "react"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { LifeBuoy, MessageSquare, Plus, CheckCircle2, Loader2, Send, Clock } from "lucide-react"
+import useSWR from "swr"
+import { toast } from "sonner"
+
+export default function SupportPage() {
+  const [showNewTicket, setShowNewTicket] = useState(false)
+  const [subject, setSubject] = useState("")
+  const [message, setMessage] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const { data, error, isLoading, mutate } = useSWR('/api/student/support')
+  const tickets = data?.tickets || []
+
+  const handleSubmit = async () => {
+    if (!subject.trim() || !message.trim()) {
+      toast.error('Subject and message are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/student/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          subject: subject.trim(),
+          message: message.trim()
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to create ticket');
+      
+      toast.success('Support ticket created successfully');
+      setSubject("");
+      setMessage("");
+      setShowNewTicket(false);
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case 'OPEN': return "destructive";
+      case 'IN_PROGRESS': return "warning";
+      case 'RESOLVED': return "success";
+      default: return "default";
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Support & Help Desk</h2>
+          <p className="text-muted-foreground">Raise tickets for technical or administrative assistance.</p>
+        </div>
+        <Button onClick={() => setShowNewTicket(!showNewTicket)}>
+          {showNewTicket ? "Cancel" : <><Plus className="mr-2 h-4 w-4" /> New Ticket</>}
+        </Button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {showNewTicket ? (
+          <Card className="md:col-span-3 border-primary-200 dark:border-primary-900 shadow-md animate-in fade-in slide-in-from-top-4">
+            <CardHeader className="bg-primary-50/50 dark:bg-primary-900/10 border-b">
+              <CardTitle>Create New Support Ticket</CardTitle>
+              <CardDescription>Provide details about the issue you are facing.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4 max-w-2xl">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Subject <span className="text-red-500">*</span></label>
+                <Input 
+                  placeholder="Brief description of the issue" 
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Message <span className="text-red-500">*</span></label>
+                <textarea 
+                  className="flex min-h-[150px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-950 dark:focus-visible:ring-primary-300" 
+                  placeholder="Please describe your issue in detail..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                ></textarea>
+              </div>
+              <Button onClick={handleSubmit} disabled={isSubmitting || !subject.trim() || !message.trim()} className="mt-2">
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Submit Ticket
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>My Tickets</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              {isLoading ? (
+                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : tickets.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <LifeBuoy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p>You haven&apos;t created any support tickets yet.</p>
+                </div>
+              ) : (
+                tickets.map((ticket: any) => (
+                  <div key={ticket.id} className="flex flex-col gap-3 p-4 border rounded-lg bg-white dark:bg-navy-950 shadow-sm">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-mono font-medium text-muted-foreground">{ticket.id.substring(0,8)}</span>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="font-semibold text-navy-900 dark:text-white">{ticket.subject}</div>
+                      </div>
+                      <Badge variant={getStatusColor(ticket.status) as any}>{ticket.status.replace("_", " ")}</Badge>
+                    </div>
+                    
+                    <div className="pl-4 border-l-2 space-y-4 mt-2 border-muted">
+                      {ticket.messages.map((msg: any) => (
+                        <div key={msg.id} className="text-sm">
+                          <div className="font-medium text-xs mb-1 flex items-center gap-2">
+                            {msg.isFromAdmin ? (
+                              <span className="text-primary-600 dark:text-primary-400">Support Team</span>
+                            ) : (
+                              <span className="text-muted-foreground">You</span>
+                            )}
+                            <span className="text-muted-foreground font-normal text-[10px]">{new Date(msg.createdAt).toLocaleString()}</span>
+                          </div>
+                          <div className={`p-3 rounded-lg inline-block ${msg.isFromAdmin ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-100' : 'bg-muted/50'}`}>
+                            {msg.message}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle>Support Guidelines</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <div className="flex gap-3 items-start">
+              <MessageSquare className="h-5 w-5 text-primary-500 shrink-0 mt-0.5" />
+              <p>Before raising a ticket, please check the FAQ section for common issues.</p>
+            </div>
+            <div className="flex gap-3 items-start">
+              <Clock className="h-5 w-5 text-primary-500 shrink-0 mt-0.5" />
+              <p>Typical response time is 24-48 working hours.</p>
+            </div>
+            <div className="flex gap-3 items-start">
+              <CheckCircle2 className="h-5 w-5 text-primary-500 shrink-0 mt-0.5" />
+              <p>Once your issue is resolved, the ticket will be closed automatically by the admin.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

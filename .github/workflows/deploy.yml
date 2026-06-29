@@ -1,0 +1,36 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger deployment only on version tags
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    
+    # If deploying to a self-hosted VPS via SSH
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USER }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd /var/www/internships-app
+          git pull origin main
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          npm run build
+          pm2 restart internships-app
+          
+    - name: Health Check
+      run: |
+        sleep 10
+        curl -f https://internships.cdac.in/api/health || exit 1

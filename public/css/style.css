@@ -1,0 +1,139 @@
+body {
+    font-family: "Axiforma" !important;
+}
+
+.content-wrapper {
+    background-color: #ffffff !important;
+}
+
+.select2-container--default .select2-search--inline .select2-search__field {
+    border: none !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: #214492 !important;
+    border-color: #214492 !important;
+    color: #fff;
+    padding: 3px 10px !important;
+    margin-top: 0.31rem;
+}
+
+.bg-wbl {
+    background-color: #214492 !important;
+    color: white;
+}
+
+.text-blue {
+    color: #214492;
+}
+
+.bg-wblgreen {
+    background-color: #e0f3e8;
+}
+
+.flash_new {
+    animation: blinker 2s ease-in-out infinite;
+}
+
+@keyframes blinker {
+    50% {
+        opacity: 0.1;
+    }
+}
+
+/*Video Styles*/
+
+.custom-video-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    /* 16:9 aspect ratio */
+    height: 0;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+}
+
+.custom-video-wrapper>* {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.custom-video {
+    object-fit: cover;
+}
+
+/* Controls bar at bottom */
+
+.custom-controls {
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 12px 18px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.5) 60%, transparent);
+    display: flex;
+    align-items: end;
+    gap: 12px;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+/* Show on hover, when paused, or temporarily */
+
+.custom-video-wrapper:hover .custom-controls,
+.custom-video-wrapper:not(.playing) .custom-controls,
+.custom-video-wrapper.controls-visible .custom-controls {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.play-pause-btn,
+.fullscreen-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.play-pause-btn {
+    font-size: 32px;
+}
+
+.play-pause-btn:hover,
+.fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0;
+    background: #ff0000;
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+/* Prevent download/right-click save */
+
+.custom-video {
+    pointer-events: none;
+}
