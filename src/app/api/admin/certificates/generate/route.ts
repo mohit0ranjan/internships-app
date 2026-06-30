@@ -44,7 +44,8 @@ export async function POST(req: Request) {
     const certNumber = `CSDAC-WBL-${year}-${nanoid(6).toUpperCase()}`;
 
     // Generate QR Code data URL
-    const verifyUrl = `${process.env.NEXTAUTH_URL}/verify/${certNumber}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'));
+    const verifyUrl = `${appUrl}/verify/${certNumber}`;
     const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl);
 
     // Create certificate record

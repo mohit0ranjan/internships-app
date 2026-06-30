@@ -68,11 +68,12 @@ export async function POST(req: Request) {
     });
 
     let emailBody = template?.body || 'Your credentials are:\nEmail: {{email}}\nPassword: {{password}}';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'));
     emailBody = emailBody
       .replace('{{name}}', application.user.name || 'Student')
       .replace('{{email}}', application.user.email || '')
       .replace('{{password}}', plainPassword)
-      .replace('{{loginUrl}}', `${process.env.NEXTAUTH_URL}/login`);
+      .replace('{{loginUrl}}', `${appUrl}/login`);
 
     return NextResponse.json({
       success: true,
