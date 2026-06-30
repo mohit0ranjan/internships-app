@@ -21,6 +21,7 @@ export const authConfig = {
       }
     }
   },
+  trustHost: true,
   providers: [], // Add providers in auth.ts
   callbacks: {
     async jwt({ token, user }) {
