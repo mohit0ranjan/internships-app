@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { chromium, Browser } from 'playwright';
 import crypto from 'crypto';
+import { auth } from '@/lib/auth';
+import fs from 'fs/promises';
+import path from 'path';
 
 // Global browser instance to optimize PDF generation
 let browserInstance: Browser | null = null;
@@ -22,15 +25,22 @@ async function getBrowser() {
   return browserPromise;
 }
 
-// Mock function for Cloud Storage Upload (Azure Blob / S3)
+// Save to local public/certificates directory
 async function uploadToStorage(buffer: Buffer, filename: string): Promise<string> {
-  // TODO: Replace with actual Azure Blob Storage or S3 upload logic
-  console.log(`Mock uploading ${filename} to storage... Size: ${buffer.length} bytes`);
-  return `https://storage.csdac.in/certificates/${filename}`;
+  const dir = path.join(process.cwd(), 'public', 'certificates');
+  await fs.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, filename);
+  await fs.writeFile(filePath, buffer);
+  return `/certificates/${filename}`;
 }
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { userId, internshipId, projectName, technology, grade } = body;
 

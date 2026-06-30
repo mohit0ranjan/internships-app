@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Select } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ProjectsPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/admin/project')
@@ -114,7 +115,10 @@ export default function ProjectsPage() {
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>
+            <div className="space-y-4">
+              <Skeleton className="h-[250px] w-full" />
+              <Skeleton className="h-[250px] w-full" />
+            </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed rounded-lg bg-white  text-muted-foreground">
               No projects found.
@@ -182,7 +186,11 @@ export default function ProjectsPage() {
             <CardContent>
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {isLoading ? (
-                   <div className="flex justify-center p-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                   <div className="space-y-3">
+                     <Skeleton className="h-12 w-full" />
+                     <Skeleton className="h-12 w-full" />
+                     <Skeleton className="h-12 w-full" />
+                   </div>
                 ) : unassignedStudents.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center p-4">All students are assigned to projects.</div>
                 ) : (

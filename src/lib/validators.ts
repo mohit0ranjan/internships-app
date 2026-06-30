@@ -15,7 +15,7 @@ export const loginSchema = z.object({
 
 export const workspaceCreateSchema = z.object({
   applicationId: z.string().cuid('Invalid application ID'),
-  batchId: z.string().cuid('Invalid batch ID'),
+  batchId: z.string().cuid('Invalid batch ID').optional(),
 });
 
 export const certificateGenerateSchema = z.object({

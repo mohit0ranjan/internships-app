@@ -9,6 +9,8 @@ import { Search, GitBranch, FileText, MessageSquare, Check, X, Loader2 } from "l
 import useSWR from "swr"
 import { toast } from "sonner"
 
+import { Skeleton } from "@/components/ui/skeleton"
+
 export default function ProgressReviewPage() {
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null)
   const [remarks, setRemarks] = useState("")
@@ -80,7 +82,12 @@ export default function ProgressReviewPage() {
           <CardContent className="flex-1 overflow-y-auto p-3">
             <div className="space-y-3">
               {isLoading ? (
-                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                <>
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </>
               ) : filteredReviews.length === 0 ? (
                 <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg">
                   <Check className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-50" />

@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Award, Search, CheckCircle, Download, ExternalLink, Loader2, UserPlus } from "lucide-react"
+import { Award, Search, CheckCircle, Download, ExternalLink, Loader2, UserPlus, AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
 import useSWR from "swr"
 import { toast } from "sonner"
@@ -14,8 +14,9 @@ export default function CertificateGenerationPage() {
   const [activeTab, setActiveTab] = useState<'SYSTEM' | 'MANUAL'>('SYSTEM')
   const [loadingAppId, setLoadingAppId] = useState<string | null>(null)
   const [isManualLoading, setIsManualLoading] = useState(false)
-  const [generatedCert, setGeneratedCert] = useState<{id: string, name: string, number: string, qr: string} | null>(null)
+  const [generatedCert, setGeneratedCert] = useState<{id: string, name: string, number: string} | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [expandedApp, setExpandedApp] = useState<string | null>(null)
 
   // Manual Form State
   const [manualForm, setManualForm] = useState({
@@ -47,8 +48,7 @@ export default function CertificateGenerationPage() {
       setGeneratedCert({
         id: result.certificate.id,
         name: name,
-        number: result.certificate.certificateNumber,
-        qr: result.certificate.qrCode
+        number: result.certificate.certificateNumber
       });
       toast.success('Certificate generated successfully!');
       mutate();
@@ -75,8 +75,7 @@ export default function CertificateGenerationPage() {
       setGeneratedCert({
         id: result.certificate.id,
         name: manualForm.studentName,
-        number: result.certificate.certificateNumber,
-        qr: result.certificate.qrCode
+        number: result.certificate.certificateNumber
       });
       toast.success('Manual certificate generated successfully!');
       
@@ -102,7 +101,7 @@ export default function CertificateGenerationPage() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-navy-900">Certificate Generation</h2>
-        <p className="text-muted-foreground">Generate verifiable QR-enabled certificates for interns.</p>
+        <p className="text-muted-foreground">Generate verifiable certificates for interns.</p>
       </div>
 
       <div className="flex gap-2 border-b pb-2">
@@ -126,8 +125,8 @@ export default function CertificateGenerationPage() {
         {activeTab === 'SYSTEM' ? (
           <Card className="flex flex-col min-h-[600px]">
             <CardHeader className="shrink-0">
-              <CardTitle>Eligible Interns</CardTitle>
-              <CardDescription>Interns eligible for certificate generation (Completed / Joined)</CardDescription>
+              <CardTitle>Interns</CardTitle>
+              <CardDescription>All enrolled interns pending certificate generation</CardDescription>
               <div className="relative mt-2">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
@@ -143,8 +142,8 @@ export default function CertificateGenerationPage() {
                 {isLoading ? (
                   <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                 ) : filteredInterns.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8 border-2 border-dashed rounded-lg">
-                    No eligible interns found.
+                  <div className="text-center text-muted-foreground py-8 border-2 border-dashed rounded-lg bg-slate-50">
+                    No interns found.
                   </div>
                 ) : (
                   filteredInterns.map((app: any) => (
@@ -154,22 +153,80 @@ export default function CertificateGenerationPage() {
                           <div className="font-semibold text-sm">{app.user.name}</div>
                           <div className="text-xs text-muted-foreground">{app.user.email}</div>
                         </div>
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Eligible</Badge>
+                        <Button
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 gap-1 px-2 text-xs" 
+                          onClick={() => setExpandedApp(expandedApp === app.id ? null : app.id)}
+                        >
+                          <Badge 
+                            variant={app.eligibility?.isEligible ? "secondary" : "outline"} 
+                            className={`mr-1 ${app.eligibility?.isEligible ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100'}`}
+                          >
+                            {app.eligibility?.isEligible ? 'Eligible' : 'Not Eligible'}
+                          </Badge>
+                          {expandedApp === app.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </Button>
                       </div>
                       
-                      <div className="text-xs bg-white p-2 rounded border mt-2">
-                        <div className="text-muted-foreground mb-1">Internship Domain</div>
-                        <div className="font-semibold text-navy-600">{app.internship.domain}</div>
+                      {expandedApp === app.id && (
+                        <div className="bg-slate-50 border rounded-md p-3 mt-1 space-y-2 text-sm shadow-inner">
+                          <h4 className="text-xs font-semibold uppercase text-muted-foreground">Eligibility Checklist</h4>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Workspace Generated</span>
+                              <span>{app.eligibility?.hasWorkspace ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Internship Assigned</span>
+                              <span>{app.eligibility?.hasInternship ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Student Verified</span>
+                              <span>{app.eligibility?.isStudentVerified ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Attendance {'>='} 70%</span>
+                              <span>{app.eligibility?.hasSufficientAttendance ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Weekly Submissions {'>='} 60%</span>
+                              <span>{app.eligibility?.hasSufficientSubmissions ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Project Submitted</span>
+                              <span>{app.eligibility?.hasProjectSubmitted ? '✅' : '❌'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-600">Payment Verified</span>
+                              <span>{app.eligibility?.isPaymentVerified ? '✅' : '❌'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="text-xs bg-white p-2 rounded border mt-2 flex justify-between items-center">
+                        <div>
+                          <div className="text-muted-foreground mb-1">Internship Domain</div>
+                          <div className="font-semibold text-navy-600">{app.internship.domain}</div>
+                        </div>
                       </div>
                       
+                      {!app.eligibility?.isEligible && (
+                        <div className="flex items-center gap-2 text-xs text-amber-600 mt-1 bg-amber-50 p-2 rounded border border-amber-100">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>Warning: Intern has not met all criteria. Generating is allowed as an Admin override.</span>
+                        </div>
+                      )}
+
                       <Button 
                         size="sm" 
-                        className="mt-2 w-full flex items-center justify-center gap-2"
+                        className={`mt-2 w-full flex items-center justify-center gap-2 ${!app.eligibility?.isEligible ? 'bg-amber-100 text-amber-900 hover:bg-amber-200' : ''}`}
                         onClick={() => handleGenerateSystem(app.id, app.user.name)}
                         disabled={loadingAppId !== null}
                       >
                         {loadingAppId === app.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />} 
-                        Issue Certificate
+                        {app.eligibility?.isEligible ? 'Issue Certificate' : 'Override & Issue Certificate'}
                       </Button>
                     </div>
                   ))
@@ -264,13 +321,9 @@ export default function CertificateGenerationPage() {
                     
                     <div>
                       <h4 className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-2">Certificate of Completion</h4>
-                      <div className="text-2xl font-bold font-serif text-navy-900">
+                      <div className="text-2xl font-bold font-serif text-navy-900 mt-12 mb-12">
                         {generatedCert.name}
                       </div>
-                    </div>
-                    
-                    <div className="flex justify-center my-6">
-                      <img src={generatedCert.qr} alt="Verification QR" className="h-28 w-28 p-1.5 bg-white border shadow-sm rounded" />
                     </div>
                     
                     <div>
@@ -301,7 +354,7 @@ export default function CertificateGenerationPage() {
               </div>
               <h3 className="text-lg font-semibold text-navy-900 mb-2">Issue Certificates</h3>
               <p className="text-sm text-muted-foreground max-w-sm">
-                Generate unique certificate numbers and verifiable QR codes securely in the database.
+                Generate unique certificate numbers securely in the database.
               </p>
             </Card>
           )}

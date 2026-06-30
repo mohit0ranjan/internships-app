@@ -31,23 +31,7 @@ export default function AssessmentPage() {
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Initialization
-  useEffect(() => {
-    if (typeof document !== 'undefined' && document.fullscreenElement) {
-      setIsFullscreen(true)
-    }
-
-    const storedAttemptId = sessionStorage.getItem('screening_attempt_id')
-    if (!storedAttemptId) {
-      toast.error("Assessment session not found.")
-      router.push('/screening')
-      return
-    }
-    setAttemptId(storedAttemptId)
-    fetchAssessment(storedAttemptId)
-  }, [router])
-
-  const fetchAssessment = async (id: string) => {
+  const fetchAssessment = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/screening/assessment?attemptId=${id}`)
       const data = await res.json()
@@ -63,28 +47,9 @@ export default function AssessmentPage() {
         router.push('/screening/success')
       }
     }
-  }
+  }, [router])
 
-  // Security Monitoring
-  useEffect(() => {
-    if (loading || isSubmitting || !attemptId) return;
-
-    const handleFullscreenChange = () => {
-      const isFs = !!document.fullscreenElement
-      setIsFullscreen(isFs)
-      if (!isFs) {
-        logViolation('FULLSCREEN_EXIT')
-      }
-    }
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange)
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange)
-    }
-  }, [loading, isSubmitting, attemptId])
-
-  const logViolation = async (type: string) => {
+  const logViolation = useCallback(async (type: string) => {
     if (!attemptId) return
     try {
       const res = await fetch('/api/screening/violation', {
@@ -105,7 +70,66 @@ export default function AssessmentPage() {
     } catch (error) {
       console.error("Failed to log violation")
     }
-  }
+  }, [attemptId, router])
+
+  const handleSubmit = useCallback(async () => {
+    if (!attemptId) return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch('/api/screening/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attemptId })
+      })
+      if (!res.ok) throw new Error("Failed to submit")
+      
+      // Exit fullscreen if needed
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(e => {})
+      }
+      
+      toast.success("Assessment submitted successfully.")
+      router.push('/screening/success')
+    } catch (error: any) {
+      toast.error(error.message)
+      setIsSubmitting(false)
+    }
+  }, [attemptId, router])
+
+  // Initialization
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      setIsFullscreen(true)
+    }
+
+    const storedAttemptId = sessionStorage.getItem('screening_attempt_id')
+    if (!storedAttemptId) {
+      toast.error("Assessment session not found.")
+      router.push('/screening')
+      return
+    }
+    setAttemptId(storedAttemptId)
+    fetchAssessment(storedAttemptId)
+  }, [router, fetchAssessment])
+
+  // Security Monitoring
+  useEffect(() => {
+    if (loading || isSubmitting || !attemptId) return;
+
+    const handleFullscreenChange = () => {
+      const isFs = !!document.fullscreenElement
+      setIsFullscreen(isFs)
+      if (!isFs) {
+        logViolation('FULLSCREEN_EXIT')
+      }
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange)
+    }
+  }, [loading, isSubmitting, attemptId, logViolation])
 
   // Timer
   useEffect(() => {
@@ -125,7 +149,7 @@ export default function AssessmentPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [timeLeft, isSubmitting])
+  }, [timeLeft, isSubmitting, handleSubmit])
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -178,30 +202,6 @@ export default function AssessmentPage() {
     if (newSet.has(qId)) newSet.delete(qId)
     else newSet.add(qId)
     setMarkedForReview(newSet)
-  }
-
-  const handleSubmit = async () => {
-    if (!attemptId) return
-    setIsSubmitting(true)
-    try {
-      const res = await fetch('/api/screening/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attemptId })
-      })
-      if (!res.ok) throw new Error("Failed to submit")
-      
-      // Exit fullscreen if needed
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(e => {})
-      }
-      
-      toast.success("Assessment submitted successfully.")
-      router.push('/screening/success')
-    } catch (error: any) {
-      toast.error(error.message)
-      setIsSubmitting(false)
-    }
   }
 
   const enterFullscreen = () => {

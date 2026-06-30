@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 
 export default function VerifyCertificatePage() {
   const params = useParams();
-  const certNumber = params.certNumber as string;
+  const certNumberArray = params.certNumber as string[] | string;
+  const certNumber = Array.isArray(certNumberArray) ? certNumberArray.map(decodeURIComponent).join('/') : decodeURIComponent(certNumberArray || '');
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

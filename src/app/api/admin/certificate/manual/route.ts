@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 
 function generateCertificateNumber() {
   const year = new Date().getFullYear();
@@ -9,6 +10,11 @@ function generateCertificateNumber() {
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     
     // Validate required manual fields
@@ -23,7 +29,6 @@ export async function POST(req: Request) {
     }
 
     const certificateNumber = generateCertificateNumber();
-    const qrCode = `https://verify.csdac.in/${certificateNumber}`;
     
     // Store in database
     const certificate = await prisma.certificate.create({
@@ -31,7 +36,6 @@ export async function POST(req: Request) {
         certificateNumber,
         issueDate: new Date(),
         status: 'GENERATED',
-        qrCode,
         isVerified: false,
         // Manual fields
         manualStudentName: studentName,

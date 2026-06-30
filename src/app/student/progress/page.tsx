@@ -25,6 +25,11 @@ export default function ProgressPage() {
       return;
     }
 
+    if (!githubUrl.trim() || !githubUrl.includes('github.com')) {
+      toast.error('Please provide a valid GitHub link');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/student/progress', {
@@ -88,7 +93,7 @@ export default function ProgressPage() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">GitHub Commit Link (Optional)</label>
+                  <label className="text-sm font-medium">GitHub Commit/Repo Link <span className="text-red-500">*</span></label>
                   <div className="flex relative">
                     <GitBranch className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
@@ -115,7 +120,7 @@ export default function ProgressPage() {
           </CardContent>
           {!hasSubmittedCurrentWeek && !isLoading && (
             <CardFooter>
-              <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !summary.trim()}>
+              <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !summary.trim() || !githubUrl.trim()}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Submit Weekly Report
               </Button>

@@ -6,7 +6,7 @@ import { z } from 'zod';
 const submitProgressSchema = z.object({
   weekNumber: z.number().int().min(1).max(24),
   summary: z.string().min(10, 'Summary must be at least 10 characters').max(2000),
-  githubUrl: z.string().url().optional().or(z.literal('')),
+  githubUrl: z.string().url('Must be a valid URL').includes('github.com', { message: 'Must be a github.com link' }),
 });
 
 export async function GET() {
@@ -20,7 +20,7 @@ export async function GET() {
 
     // Auto-detect project from user's active application
     const application = await prisma.application.findFirst({
-      where: { userId, status: { in: ['JOINED', 'COMPLETED'] } },
+      where: { userId, status: { in: ['SELECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'] } },
       include: { project: true }
     });
 

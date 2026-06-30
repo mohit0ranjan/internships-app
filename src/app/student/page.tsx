@@ -198,7 +198,7 @@ export default function StudentDashboard() {
                         </p>
                       </div>
                       <div className="w-full bg-navy-200 h-1.5 rounded-full overflow-hidden mt-4">
-                        <div className="bg-navy-400 h-full rounded-full" style={{ width: '30%' }}></div>
+                        <div className="bg-navy-400 h-full rounded-full" style={{ width: `${Math.min(((data?.attendanceCount || 0) / 90) * 100, 100)}%` }}></div>
                       </div>
                     </div>
                   )}

@@ -1,10 +1,13 @@
 "use client"
 
+import { useState } from "react"
+
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, GraduationCap, Briefcase, Mail, Phone, MapPin, ExternalLink, AlertCircle, ShieldAlert, CheckCircle2, XCircle } from "lucide-react"
+import { ArrowLeft, User, GraduationCap, Briefcase, Mail, Phone, MapPin, ExternalLink, AlertCircle, ShieldAlert, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import useSWR from "swr"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -13,11 +16,43 @@ export default function CandidateReviewPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
   const { data, error, isLoading, mutate } = useSWR(`/api/admin/screening/${id}`)
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading candidate details...</div>
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-10" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-6 md:col-span-1">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <div className="space-y-6 md:col-span-2">
+            <div className="grid grid-cols-4 gap-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+            <Skeleton className="h-96 w-full" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (error || !data?.attempt) {
@@ -34,6 +69,7 @@ export default function CandidateReviewPage() {
   const profile = user.candidateProfile
 
   const handleUpdateStatus = async (newStatus: string) => {
+    setIsUpdating(newStatus);
     try {
       const res = await fetch('/api/admin/applicants', {
         method: 'PUT',
@@ -44,9 +80,11 @@ export default function CandidateReviewPage() {
       if (!res.ok) throw new Error(result.error);
       
       toast.success(`Applicant moved to ${newStatus}`);
-      mutate(); // This won't directly update the attempt object if we only update application status, but we can refresh the page or rely on the admin to go back to applicants.
+      mutate();
     } catch (err: any) {
       toast.error(err.message || 'An error occurred');
+    } finally {
+      setIsUpdating(null);
     }
   }
 
@@ -70,14 +108,18 @@ export default function CandidateReviewPage() {
         <div className="flex gap-2">
           <Button 
             onClick={() => handleUpdateStatus('INTERVIEW')}
+            disabled={isUpdating !== null}
             className="bg-primary-600 hover:bg-primary-700"
           >
+            {isUpdating === 'INTERVIEW' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Shortlist for Interview
           </Button>
           <Button 
             onClick={() => handleUpdateStatus('REJECTED')}
+            disabled={isUpdating !== null}
             variant="destructive"
           >
+            {isUpdating === 'REJECTED' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Reject Candidate
           </Button>
         </div>

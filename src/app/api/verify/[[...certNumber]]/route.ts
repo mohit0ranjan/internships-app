@@ -3,10 +3,15 @@ import { NextResponse } from 'next/server';
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ certNumber: string }> }
+  { params }: { params: Promise<{ certNumber?: string[] }> }
 ) {
   try {
-    const { certNumber } = await params;
+    const url = new URL(req.url);
+    const queryId = url.searchParams.get('id');
+    const { certNumber: certNumberArray } = await params;
+    
+    // Support both /api/verify?id=XXX and /api/verify/X/Y/Z
+    const certNumber = queryId || (Array.isArray(certNumberArray) ? certNumberArray.map(decodeURIComponent).join('/') : decodeURIComponent(certNumberArray || ''));
     
     if (!certNumber) {
       return NextResponse.json({ error: 'Certificate number required' }, { status: 400 });

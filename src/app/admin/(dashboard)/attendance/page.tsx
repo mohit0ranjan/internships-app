@@ -6,6 +6,8 @@ import { CheckSquare, Calendar as CalendarIcon, User, Clock } from "lucide-react
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+import { Skeleton } from "@/components/ui/skeleton";
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function AdminAttendancePage() {
@@ -48,7 +50,13 @@ export default function AdminAttendancePage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="py-12 text-center text-navy-400">Loading records...</div>
+            <div className="space-y-4 py-4">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
           ) : error ? (
             <div className="py-12 text-center text-red-500">Failed to load records.</div>
           ) : data?.records?.length === 0 ? (

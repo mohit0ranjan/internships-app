@@ -2,18 +2,48 @@
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Briefcase, MapPin, Calendar, Clock, DollarSign, BookOpen } from "lucide-react"
+import { Loader2, Briefcase, MapPin, Calendar, Clock, DollarSign, BookOpen, AlertCircle } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import useSWR from "swr"
 
 export default function InternshipDetailsPage() {
   const { data, error, isLoading } = useSWR('/api/student/dashboard')
 
   if (isLoading) {
-    return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto">
+        <div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <Card className="border-t-4 border-t-primary-600 shadow-md">
+          <CardHeader className="pb-4">
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-8 w-1/2" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton className="h-32 w-full" />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (error || !data?.application?.internship) {
-    return <div className="text-red-500 text-center py-10">Failed to load internship details.</div>
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <AlertCircle className="h-12 w-12 text-muted-foreground" />
+        <h3 className="text-xl font-semibold text-navy-900">No Internship Assigned Yet</h3>
+        <p className="text-muted-foreground max-w-md">
+          You are not currently assigned to an active internship. Once your application is fully processed and a workspace is generated, your internship details will appear here.
+        </p>
+      </div>
+    )
   }
 
   const { internship } = data.application

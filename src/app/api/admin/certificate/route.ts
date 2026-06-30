@@ -9,12 +9,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find all COMPLETED applications that don't have a certificate yet
-    // For testing purposes, we'll also fetch JOINED users so there is data to test with
-    const eligibleInterns = await prisma.application.findMany({
+    // Find all relevant applications that don't have a certificate yet
+    const applications = await prisma.application.findMany({
       where: {
         status: {
-          in: ["COMPLETED", "JOINED"]
+          in: ["SELECTED", "OFFER_LETTER_SENT", "JOINED", "COMPLETED"]
         },
         user: {
           certificates: {
@@ -28,6 +27,9 @@ export async function GET(req: NextRequest) {
             id: true,
             name: true,
             email: true,
+            emailVerified: true,
+            attendances: true,
+            weeklyProgress: true,
           }
         },
         internship: {
@@ -36,11 +38,56 @@ export async function GET(req: NextRequest) {
             title: true,
             domain: true
           }
-        }
+        },
+        project: true,
+        payment: true,
       },
       orderBy: {
         updatedAt: "desc"
       }
+    });
+
+    const eligibleInterns = applications.map((app) => {
+      // Eligibility calculations
+      const hasWorkspace = app.status === "JOINED" || app.status === "COMPLETED";
+      const hasInternship = !!app.internshipId;
+      const isStudentVerified = !!app.user.emailVerified;
+      
+      const totalAttendances = app.user.attendances.length;
+      const presentCount = app.user.attendances.filter(a => a.status === "PRESENT").length;
+      const attendanceRatio = totalAttendances > 0 ? (presentCount / totalAttendances) : 0;
+      const hasSufficientAttendance = attendanceRatio >= 0.70;
+
+      // Weekly submissions >= 60%
+      // Assuming a standard 6 weeks project, or just calculating based on how many they submitted.
+      // For a robust system, we check if they submitted at least 3 weeks or use a dynamic threshold.
+      const hasSufficientSubmissions = app.user.weeklyProgress.length >= 3;
+
+      const hasProjectSubmitted = app.project !== null;
+      const isPaymentVerified = app.payment ? (app.payment.status === "SUCCESS") : true; // Assuming true if no payment required
+
+      const isEligible = 
+        hasWorkspace && 
+        hasInternship && 
+        isStudentVerified && 
+        hasSufficientAttendance && 
+        hasSufficientSubmissions && 
+        hasProjectSubmitted && 
+        isPaymentVerified;
+
+      return {
+        ...app,
+        eligibility: {
+          isEligible,
+          hasWorkspace,
+          hasInternship,
+          isStudentVerified,
+          hasSufficientAttendance,
+          hasSufficientSubmissions,
+          hasProjectSubmitted,
+          isPaymentVerified,
+        }
+      };
     });
 
     return NextResponse.json({ eligibleInterns });
@@ -79,7 +126,6 @@ export async function POST(req: NextRequest) {
     // Generate unique cert number
     const uniqueSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
     const certNumber = `CSDAC-WBL-2026-${uniqueSuffix}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://internships.csdac.in/verify/${certNumber}`;
 
     // Create the certificate
     const certificate = await prisma.certificate.create({
@@ -88,7 +134,6 @@ export async function POST(req: NextRequest) {
         internshipId: application.internshipId,
         certificateNumber: certNumber,
         issueDate: new Date(),
-        qrCode: qrUrl,
         status: "GENERATED"
       },
       include: {

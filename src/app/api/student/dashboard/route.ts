@@ -15,7 +15,7 @@ export async function GET() {
     const application = await prisma.application.findFirst({
       where: { 
         userId,
-        status: { in: ['JOINED', 'COMPLETED'] }
+        status: { in: ['SELECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'] }
       },
       include: { 
         internship: true,

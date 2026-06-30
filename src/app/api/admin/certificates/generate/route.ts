@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import QRCode from 'qrcode';
 import { rateLimit } from '@/lib/rate-limit';
 import { certificateGenerateSchema } from '@/lib/validators';
 
@@ -43,11 +42,6 @@ export async function POST(req: Request) {
     const year = new Date().getFullYear();
     const certNumber = `CSDAC-WBL-${year}-${nanoid(6).toUpperCase()}`;
 
-    // Generate QR Code data URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'));
-    const verifyUrl = `${appUrl}/verify/${certNumber}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl);
-
     // Create certificate record
     const certificate = await prisma.certificate.create({
       data: {
@@ -55,7 +49,6 @@ export async function POST(req: Request) {
         internshipId,
         certificateNumber: certNumber,
         issueDate: new Date(),
-        qrCode: qrCodeDataUrl,
         status: 'ISSUED',
         isVerified: true,
         verifiedAt: new Date()

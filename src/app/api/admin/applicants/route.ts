@@ -21,7 +21,11 @@ export async function GET(req: Request) {
     const applicants = await prisma.application.findMany({
       where: filter,
       include: {
-        user: true,
+        user: {
+          include: {
+            batches: true
+          }
+        },
         internship: true,
       },
       orderBy: { createdAt: 'desc' }

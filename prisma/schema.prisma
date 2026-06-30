@@ -279,7 +279,6 @@ model Certificate {
   internshipId      String?
   certificateNumber String            @unique
   issueDate         DateTime?
-  qrCode            String?           @db.Text
   downloadUrl       String?
   pdfUrl            String?
   status            CertificateStatus @default(PENDING)

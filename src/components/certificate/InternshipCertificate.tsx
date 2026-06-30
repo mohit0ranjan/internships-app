@@ -1,5 +1,4 @@
 import React from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 
 interface InternshipCertificateProps {
   studentName: string;
@@ -178,17 +177,7 @@ export function InternshipCertificate({
           <div className="grid grid-cols-[1fr_auto_1fr] items-end pt-[10px] mt-[10px] border-t border-[#e8e0cc]">
             
             {/* Left: Cert Details & QR */}
-            <div className="text-left flex items-end gap-3">
-              <div className="bg-white p-1 border border-gray-200">
-                <QRCodeSVG 
-                  value={verificationUrl}
-                  size={50}
-                  bgColor={"#ffffff"}
-                  fgColor={"#1b3a5c"}
-                  level={"L"}
-                  includeMargin={false}
-                />
-              </div>
+            <div className="text-left flex flex-col justify-end">
               <div>
                 <div className="text-[#bbb] font-bold text-[6.5px] tracking-[1.5px] uppercase" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>Certificate No.</div>
                 <div className="text-[#1b3a5c] font-semibold text-[10.5px] mb-[5px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>{certificateId}</div>
@@ -209,20 +198,30 @@ export function InternshipCertificate({
             <div className="flex justify-end gap-[30px]">
               
               <div className="text-center min-w-[115px]">
-                <div className="w-[125px] h-[34px] border-b border-[#aaa] flex items-end justify-center mb-[4px]">
-                  <span className="text-[#1b3a5c] opacity-55 text-[19px] italic pb-[2px]" style={{ fontFamily: 'var(--font-playfair), serif' }}>
-                    {programDirectorName.split(' ')[0]}
-                  </span>
+                <div className="w-[125px] h-[34px] border-b border-[#aaa] flex items-end justify-center mb-[4px] relative">
+                  {programDirectorName === "Dr. Aditi Verma" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src="/assets/img/signatures/aditi.jpg" alt="Signature" className="absolute bottom-[2px] h-[30px] object-contain opacity-80" style={{ mixBlendMode: 'multiply' }} />
+                  ) : (
+                    <span className="text-[#1b3a5c] opacity-55 text-[19px] italic pb-[2px]" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                      {programDirectorName.split(' ')[0]}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[#1b3a5c] font-bold text-[9.5px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>{programDirectorName}</div>
                 <div className="text-[#999] uppercase tracking-[1.2px] font-medium text-[7px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>{programDirectorDesignation}</div>
               </div>
               
               <div className="text-center min-w-[115px]">
-                <div className="w-[125px] h-[34px] border-b border-[#aaa] flex items-end justify-center mb-[4px]">
-                  <span className="text-[#1b3a5c] opacity-55 text-[19px] italic pb-[2px]" style={{ fontFamily: 'var(--font-playfair), serif' }}>
-                    {trainingHeadName.split(' ')[0]}
-                  </span>
+                <div className="w-[125px] h-[34px] border-b border-[#aaa] flex items-end justify-center mb-[4px] relative">
+                  {trainingHeadName === "Rajesh Kumar" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src="/assets/img/signatures/rajesh.jpg" alt="Signature" className="absolute bottom-[2px] h-[30px] object-contain opacity-80" style={{ mixBlendMode: 'multiply' }} />
+                  ) : (
+                    <span className="text-[#1b3a5c] opacity-55 text-[19px] italic pb-[2px]" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+                      {trainingHeadName.split(' ')[0]}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[#1b3a5c] font-bold text-[9.5px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>{trainingHeadName}</div>
                 <div className="text-[#999] uppercase tracking-[1.2px] font-medium text-[7px]" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>{trainingHeadDesignation}</div>

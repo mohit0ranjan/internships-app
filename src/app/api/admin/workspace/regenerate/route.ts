@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 import { rateLimit } from '@/lib/rate-limit';
-import { workspaceCreateSchema } from '@/lib/validators';
+import { z } from 'zod';
+
+const regenerateSchema = z.object({
+  applicationId: z.string().cuid('Invalid application ID'),
+});
 
 export async function POST(req: Request) {
   try {
@@ -18,13 +22,13 @@ export async function POST(req: Request) {
     if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
-    const parsed = workspaceCreateSchema.safeParse(body);
+    const parsed = regenerateSchema.safeParse(body);
     
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.format() }, { status: 400 });
     }
 
-    const { applicationId, batchId } = parsed.data;
+    const { applicationId } = parsed.data;
 
     // Get application and user
     const application = await prisma.application.findUnique({
@@ -36,47 +40,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     }
 
-    if (application.status === 'JOINED') {
-      return NextResponse.json({ error: 'Workspace already exists for this applicant' }, { status: 400 });
-    }
-
-    if (application.status !== 'OFFER_LETTER_SENT' && application.status !== 'SELECTED') {
-      return NextResponse.json({ error: 'Application must be SELECTED to generate a workspace' }, { status: 400 });
+    if (application.status !== 'JOINED') {
+      return NextResponse.json({ error: 'Workspace must be generated (JOINED status) before regenerating credentials' }, { status: 400 });
     }
 
     // Generate random password
     const plainPassword = nanoid(10);
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    // Use a transaction to ensure all workspace operations succeed or fail together
-    await prisma.$transaction(async (tx) => {
-      // 1. Create a Project (Workspace)
-      const project = await tx.project.create({
-        data: {
-          title: `Workspace: ${application.internship.title}`,
-          description: `Personal workspace for ${application.user.name} during the ${application.internship.title} internship.`,
-          internshipId: application.internshipId,
-        }
-      });
-
-      // 2. Update user to active, set password, and optionally connect batch
-      await tx.user.update({
-        where: { id: application.userId },
-        data: {
-          password: hashedPassword,
-          isActive: true,
-          ...(batchId ? { batches: { connect: { id: batchId } } } : {})
-        }
-      });
-
-      // 3. Update application status to JOINED and link the project
-      await tx.application.update({
-        where: { id: applicationId },
-        data: { 
-          status: 'JOINED',
-          projectId: project.id
-        }
-      });
+    // Update user password
+    await prisma.user.update({
+      where: { id: application.userId },
+      data: {
+        password: hashedPassword,
+      }
     });
 
     // Get email template
@@ -94,7 +71,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Workspace account generated successfully',
+      message: 'Workspace password regenerated successfully',
       credentials: {
         email: application.user.email,
         password: plainPassword,
@@ -103,7 +80,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Workspace generation error:', error);
+    console.error('Workspace regeneration error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

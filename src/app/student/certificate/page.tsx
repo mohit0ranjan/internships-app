@@ -76,10 +76,10 @@ export default function CertificatePage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-4">
               <p>
-                Every certificate issued by CSDAC contains a unique cryptographic QR code and ID number.
+                Every certificate issued by CSDAC contains a unique cryptographic ID number.
               </p>
               <p>
-                Employers and institutions can scan the QR code or enter the ID at <span className="font-semibold text-navy-900 ">internships.csdac.in/verify</span> to instantly verify its authenticity.
+                Employers and institutions can enter the ID at <span className="font-semibold text-navy-900 ">internships.csdac.in/verify</span> to instantly verify its authenticity.
               </p>
             </CardContent>
           </Card>
