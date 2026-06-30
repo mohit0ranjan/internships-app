@@ -36,13 +36,18 @@ export async function GET(
       certificate: {
         certificateNumber: certificate.certificateNumber,
         issueDate: certificate.issueDate,
-        studentName: certificate.user.name,
-        college: certificate.user.college,
-        degree: certificate.user.degree,
-        internshipTitle: certificate.internship.title,
-        domain: certificate.internship.domain,
-        centre: certificate.internship.centre,
-        duration: certificate.internship.duration,
+        studentName: certificate.user?.name || certificate.manualStudentName,
+        college: certificate.user?.college || certificate.manualCollege,
+        degree: certificate.user?.degree || certificate.manualDegree,
+        internshipTitle: certificate.internship?.title || certificate.manualDomain, // Fallback title to domain
+        domain: certificate.internship?.domain || certificate.manualDomain,
+        centre: certificate.internship?.centre || certificate.manualCentre,
+        duration: certificate.internship?.duration || certificate.manualDuration,
+        projectName: certificate.projectName,
+        technology: certificate.technology,
+        grade: certificate.grade,
+        status: certificate.status,
+        pdfUrl: certificate.pdfUrl || certificate.downloadUrl,
       }
     });
   } catch (error) {

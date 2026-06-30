@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Inter, Outfit, Playfair_Display, Cinzel, Poppins } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/providers/auth-context";
 import SWRProvider from "@/components/providers/swr-provider";
@@ -8,12 +8,28 @@ import { Toaster } from 'sonner';
 
 const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
 });
 
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-heading",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+});
+
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  variable: "--font-cinzel",
+});
+
+const poppins = Poppins({
+  weight: ['400', '500', '600', '700'],
+  subsets: ["latin"],
+  variable: "--font-poppins",
 });
 
 export const metadata: Metadata = {
@@ -52,7 +68,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${outfit.variable} antialiased`}>
+      <body className={`${inter.variable} ${outfit.variable} ${playfair.variable} ${cinzel.variable} ${poppins.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light" disableTransitionOnChange>
           <SWRProvider>
             <AuthProvider>

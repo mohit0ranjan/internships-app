@@ -160,17 +160,72 @@ export default function VerifyCertificatePage() {
                           <Clock className="w-4 h-4 text-navy-400" /> {data.duration}
                         </p>
                       </div>
+                      <div className="sm:col-span-2 pt-2 border-t border-navy-100/50 mt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm text-navy-500 mb-0.5">Project</p>
+                            <p className="font-medium text-navy-900 truncate" title={data.projectName}>{data.projectName || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-navy-500 mb-0.5">Technology Stack</p>
+                            <p className="font-medium text-navy-900 truncate" title={data.technology}>{data.technology || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-navy-500 mb-0.5">Performance Grade</p>
+                            <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50">
+                              {data.grade || 'N/A'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
+                
+                {/* Digital Seal */}
+                <div className="flex flex-col items-center justify-center pt-4 border-t border-navy-50">
+                  <div className="w-24 h-24 mb-2 relative flex items-center justify-center">
+                    <svg viewBox="0 0 200 200" className="w-full h-full text-navy-900" fill="currentColor">
+                      <circle cx="100" cy="100" r="95" fill="none" stroke="#C89B3C" strokeWidth="4" />
+                      <circle cx="100" cy="100" r="88" fill="none" stroke="#0B3C5D" strokeWidth="2" strokeDasharray="4 4" />
+                      <defs>
+                        <path id="sealPath" d="M 100, 100 m -70, 0 a 70,70 0 1,1 140,0 a 70,70 0 1,1 -140,0" />
+                        <path id="sealPathBottom" d="M 100, 100 m -70, 0 a 70,70 0 0,0 140,0" />
+                      </defs>
+                      <text fontSize="18" fontWeight="bold" fill="#0B3C5D" letterSpacing="2">
+                        <textPath href="#sealPath" startOffset="50%" textAnchor="middle">• CSDAC OFFICIAL SEAL •</textPath>
+                      </text>
+                      <text fontSize="14" fontWeight="600" fill="#C89B3C" letterSpacing="1">
+                        <textPath href="#sealPathBottom" startOffset="50%" textAnchor="middle">EXCELLENCE • INNOVATION • LEARNING</textPath>
+                      </text>
+                      <path d="M80 130 L100 80 L120 130 Z" fill="#0B3C5D" />
+                      <circle cx="100" cy="110" r="10" fill="#C89B3C" />
+                    </svg>
+                  </div>
+                  <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 font-medium">
+                    Digitally Verified & Secured
+                  </Badge>
+                  <p className="text-xs text-navy-400 mt-2 font-mono">
+                    Status: {data.status}
+                  </p>
                 </div>
                 
               </div>
             </CardContent>
             <CardFooter className="bg-white border-t border-navy-100 p-4 flex justify-between items-center text-sm text-navy-500">
               <p>Verified by CSDAC Portal</p>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
-                <Download className="w-4 h-4" /> Save Record
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
+                  <Download className="w-4 h-4" /> Save Record
+                </Button>
+                {data.pdfUrl && (
+                  <Button size="sm" className="gap-2 bg-navy-900 hover:bg-navy-800 text-white" asChild>
+                    <a href={data.pdfUrl} target="_blank" rel="noopener noreferrer">
+                      Download PDF
+                    </a>
+                  </Button>
+                )}
+              </div>
             </CardFooter>
           </Card>
         )}

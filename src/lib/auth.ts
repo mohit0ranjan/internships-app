@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import type { NextRequest } from 'next/server';
+import { authConfig } from './auth.config';
 
 if (!process.env.NEXTAUTH_SECRET) {
   console.warn('WARNING: NEXTAUTH_SECRET is not set. Auth will fail in production.');
@@ -18,6 +18,7 @@ function extractIp(req: any): string {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -85,20 +86,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             select: { isActive: true, role: true },
           });
           if (!dbUser || !dbUser.isActive) {
-            // Returning null-like token will invalidate the session
             return { ...token, error: 'AccountDeactivated' };
           }
-          // Keep role in sync in case it was changed
           token.role = dbUser.role;
         } catch {
-          // DB error — allow token to pass rather than locking out all users
+          // DB error
         }
       }
 
       return token;
     },
     async session({ session, token }) {
-      // Block sessions for deactivated accounts
       if ((token as any).error === 'AccountDeactivated') {
         return { ...session, user: undefined as any };
       }
@@ -109,26 +107,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
   },
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
-  session: { 
-    strategy: 'jwt',
-    maxAge: 24 * 60 * 60, // 24 hours
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-authjs.session-token' : 'authjs.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      }
-    }
-  }
 });
 
 async function logLoginAttempt(userId: string, status: 'SUCCESS' | 'FAILED', ipAddress: string = 'unknown') {

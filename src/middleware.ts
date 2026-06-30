@@ -1,7 +1,9 @@
-import { auth } from '@/lib/auth';
+import NextAuth from 'next-auth';
+import { authConfig } from '@/lib/auth.config';
+const { auth } = NextAuth(authConfig);
 import { NextResponse } from 'next/server';
 
-const publicRoutes = ['/', '/domains', '/openings', '/programme', '/faqs', '/login', '/admin/login', '/api/auth', '/screening', '/api/screening'];
+const publicRoutes = ['/', '/domains', '/openings', '/programme', '/faqs', '/login', '/admin/login', '/api/auth', '/screening', '/api/screening', '/certificate'];
 const authRoutes = ['/login', '/admin/login'];
 
 export default auth((req) => {
