@@ -326,6 +326,34 @@ export default function CandidateReviewPage() {
                   const isCorrect = answer.isCorrect;
                   const isSkipped = answer.selectedOption === null;
                   
+                  if (!q) {
+                    return (
+                      <div key={answer.id} className="border border-slate-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-medium text-slate-500 italic">Q{idx + 1}. Question data unavailable</div>
+                          <div>
+                            {isSkipped ? (
+                              <Badge variant="outline" className="bg-slate-100">Skipped</Badge>
+                            ) : isCorrect ? (
+                              <Badge variant="success" className="bg-green-100 text-green-800">Correct</Badge>
+                            ) : (
+                              <Badge variant="destructive" className="bg-red-100 text-red-800">Incorrect</Badge>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1 mt-4 text-sm">
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground w-32 shrink-0">Candidate Answer:</span>
+                            <span className={`font-medium ${isSkipped ? 'text-slate-400 italic' : isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                              {answer.selectedOption || 'No answer provided'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={answer.id} className="border border-slate-200 rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">
