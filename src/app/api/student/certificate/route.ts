@@ -17,6 +17,7 @@ export async function GET() {
       include: {
         internship: true,
         project: true,
+        workspaceAssignment: true,
         user: { select: { name: true } }
       }
     });
@@ -38,9 +39,10 @@ export async function GET() {
 
     // Progress count
     let progressCount = 0;
-    if (application?.projectId) {
+    const projectId = application?.workspaceAssignment?.projectId || application?.projectId;
+    if (projectId) {
       progressCount = await prisma.weeklyProgress.count({
-        where: { userId, projectId: application.projectId }
+        where: { userId, projectId: projectId }
       });
     }
 

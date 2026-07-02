@@ -337,8 +337,10 @@ export default function CertificateGenerationPage() {
 
               </CardContent>
               <CardFooter className="bg-navy-50 border-t flex gap-2 shrink-0 p-4">
-                <Button className="flex-1" variant="outline">
-                  <Download className="h-4 w-4 mr-2" /> Download PDF
+                <Button className="flex-1" variant="outline" asChild>
+                  <a href={`/api/certificate/download/${generatedCert.number}`} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" /> Download PDF
+                  </a>
                 </Button>
                 <Button className="flex-1 bg-navy-900 hover:bg-navy-800 text-white" asChild>
                   <Link href={`/verify/${generatedCert.number}`} target="_blank">

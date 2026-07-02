@@ -83,10 +83,14 @@ export async function POST(req: Request) {
       }
     });
 
-    // Also update Application screening score
+    // Also update Application screening score and transition status to SCREENING
+    const currentApp = await prisma.application.findUnique({ where: { id: attempt.applicationId } });
     await prisma.application.update({
       where: { id: attempt.applicationId },
-      data: { screeningScore: score < 0 ? 0 : Math.round(score) }
+      data: { 
+        screeningScore: score < 0 ? 0 : Math.round(score),
+        ...(currentApp?.status === 'SUBMITTED' ? { status: 'SCREENING' } : {})
+      }
     });
 
     return NextResponse.json({ success: true, result: updatedAttempt });

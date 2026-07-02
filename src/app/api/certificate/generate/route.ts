@@ -1,29 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { chromium, Browser } from 'playwright';
 import crypto from 'crypto';
 import { auth } from '@/lib/auth';
 import fs from 'fs/promises';
 import path from 'path';
-
-// Global browser instance to optimize PDF generation
-let browserInstance: Browser | null = null;
-let browserPromise: Promise<Browser> | null = null;
-
-async function getBrowser() {
-  if (browserInstance) return browserInstance;
-  if (browserPromise) return browserPromise;
-
-  browserPromise = chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-  }).then(browser => {
-    browserInstance = browser;
-    return browser;
-  });
-
-  return browserPromise;
-}
+import { renderToStream } from '@react-pdf/renderer';
+import { PdfCertificate } from '@/components/certificate/PdfCertificate';
+import React from 'react';
 
 // Save to local public/certificates directory
 async function uploadToStorage(buffer: Buffer, filename: string): Promise<string> {
@@ -32,6 +15,15 @@ async function uploadToStorage(buffer: Buffer, filename: string): Promise<string
   const filePath = path.join(dir, filename);
   await fs.writeFile(filePath, buffer);
   return `/certificates/${filename}`;
+}
+
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const buffers: Buffer[] = [];
+    stream.on('data', (data) => buffers.push(Buffer.isBuffer(data) ? data : Buffer.from(data)));
+    stream.on('end', () => resolve(Buffer.concat(buffers)));
+    stream.on('error', reject);
+  });
 }
 
 export async function POST(req: Request) {
@@ -58,13 +50,31 @@ export async function POST(req: Request) {
       where: { userId_internshipId: { userId, internshipId } }
     });
 
+    const application = await prisma.application.findUnique({
+      where: { userId_internshipId: { userId, internshipId } },
+      include: { 
+        workspaceAssignment: { include: { project: true } },
+        user: true,
+        internship: true
+      }
+    });
+
+    const ws = application?.workspaceAssignment;
+    const user = application?.user;
+    const internship = application?.internship;
+    
+    const finalProjectName = projectName || ws?.certificateProjectName || ws?.project?.title || 'N/A';
+    const finalTechnology = technology || ws?.certificateTechnologies || ws?.project?.techStack || 'N/A';
+    const finalDuration = ws?.certificateDuration || ws?.internshipDuration || undefined;
+
     if (certificate) {
       // Update existing
       certificate = await prisma.certificate.update({
         where: { id: certificate.id },
         data: {
-          projectName,
-          technology,
+          projectName: finalProjectName,
+          technology: finalTechnology,
+          manualDuration: finalDuration || certificate.manualDuration,
           grade,
           issueDate: new Date(),
           status: 'GENERATED'
@@ -77,69 +87,81 @@ export async function POST(req: Request) {
           userId,
           internshipId,
           certificateNumber: certificateId,
-          projectName,
-          technology,
+          projectName: finalProjectName,
+          technology: finalTechnology,
+          manualDuration: finalDuration,
           grade,
           issueDate: new Date(),
           status: 'GENERATED',
-          verificationUrl: `https://verify.csdac.in/${certificateId}`
+          verificationUrl: `https://csdac.in/verify/${certificateId}`
         }
       });
     }
 
-    // 3. Render PDF using Playwright
-    const browser = await getBrowser();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    try {
-      // Determine base URL dynamically or use environment variable
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
-      const renderUrl = `${baseUrl}/certificate/render/${certificate.certificateNumber}`;
-
-      await page.goto(renderUrl, { waitUntil: 'networkidle', timeout: 30000 });
-      
-      // Wait for custom fonts to load
-      await page.evaluate(() => document.fonts.ready);
-
-      // Generate PDF
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        landscape: true,
-        printBackground: true,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    // Format dates
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'long', year: 'numeric'
       });
+    };
 
-      // 4. Upload to Azure Blob Storage / S3
-      const filename = `${certificate.certificateNumber}.pdf`;
-      const pdfUrl = await uploadToStorage(pdfBuffer, filename);
+    const startDateStr = internship?.startDate ? formatDate(internship.startDate) : (certificate.manualDuration?.split(' - ')[0] || 'Start Date');
+    const endDateStr = internship?.endDate ? formatDate(internship.endDate) : (certificate.manualDuration?.split(' - ')[1] || 'End Date');
+    const issueDateStr = certificate.issueDate ? formatDate(certificate.issueDate) : formatDate(certificate.createdAt);
 
-      // 5. Update DB with PDF URL
-      certificate = await prisma.certificate.update({
-        where: { id: certificate.id },
-        data: {
-          pdfUrl,
-          downloadUrl: pdfUrl,
-          status: 'ISSUED'
-        }
-      });
+    // Resolve absolute paths for images
+    const csdacLogoPath = path.join(process.cwd(), 'public', 'assets', 'img', 'csdac-navbar.png');
+    const aditiSignPath = path.join(process.cwd(), 'public', 'assets', 'img', 'signatures', 'aditi.jpg');
+    const rajeshSignPath = path.join(process.cwd(), 'public', 'assets', 'img', 'signatures', 'rajesh.jpg');
 
-      return NextResponse.json({
-        success: true,
+    // 3. Render PDF using @react-pdf/renderer
+    const pdfStream = await renderToStream(
+      React.createElement(PdfCertificate, {
+        studentName: user?.name || certificate.manualStudentName || 'Student Name',
+        internshipDomain: internship?.domain || certificate.manualDomain || 'Internship Domain',
+        startDate: startDateStr,
+        endDate: endDateStr,
+        projectName: certificate.projectName || 'Internship Project',
+        technologyStack: certificate.technology || 'Various Technologies',
+        grade: certificate.grade || 'A+',
         certificateId: certificate.certificateNumber,
-        pdfUrl: certificate.pdfUrl,
-        metadata: {
-          studentName: certificate.projectName, // Might need full user query for actual name
-          issueDate: certificate.issueDate,
-          status: certificate.status
-        }
-      });
+        issueDate: issueDateStr,
+        programDirectorName: "Dr. Aditi Verma",
+        programDirectorDesignation: "Program Director",
+        trainingHeadName: "Rajesh Kumar",
+        trainingHeadDesignation: "Training Head",
+        logoSrc: csdacLogoPath,
+        sign1Src: aditiSignPath,
+        sign2Src: rajeshSignPath,
+      }) as any
+    );
 
-    } finally {
-      // Safely close the page to free memory
-      await page.close();
-      await context.close();
-    }
+    const pdfBuffer = await streamToBuffer(pdfStream);
+
+    // 4. Upload to Storage
+    const filename = `${certificate.certificateNumber}.pdf`;
+    const pdfUrl = await uploadToStorage(pdfBuffer, filename);
+
+    // 5. Update DB with PDF URL
+    certificate = await prisma.certificate.update({
+      where: { id: certificate.id },
+      data: {
+        pdfUrl,
+        downloadUrl: pdfUrl,
+        status: 'ISSUED'
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      certificateId: certificate.certificateNumber,
+      pdfUrl: certificate.pdfUrl,
+      metadata: {
+        studentName: certificate.projectName, // Might need full user query for actual name
+        issueDate: certificate.issueDate,
+        status: certificate.status
+      }
+    });
 
   } catch (error) {
     console.error('Certificate generation error:', error);

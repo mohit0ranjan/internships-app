@@ -21,8 +21,9 @@ export default function CertificatePage() {
   const { application, attendance, progress, certificate } = data;
 
   const isAttendanceMet = attendance?.percentage >= 75;
-  const isProgressMet = progress?.count >= 4; // Assuming 4 is minimum required
-  const isProjectMet = application?.project?.githubUrl ? true : false;
+  const requiredReports = parseInt(application?.workspaceAssignment?.internshipDuration || application?.internship?.duration || "3") * 3;
+  const isProgressMet = progress?.count >= requiredReports; 
+  const isProjectMet = application?.workspaceAssignment?.project?.githubRepoUrl || application?.project?.githubRepoUrl ? true : false;
   
   const isEligible = isAttendanceMet && isProgressMet && isProjectMet && application?.status === 'COMPLETED';
 
@@ -45,7 +46,7 @@ export default function CertificatePage() {
                 {isAttendanceMet ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
               </div>
               <div className="flex items-center justify-between border-b pb-3">
-                <span className="text-sm">Weekly Reports ({progress?.count || 0})</span>
+                <span className="text-sm">Weekly Reports ({progress?.count || 0}/{requiredReports})</span>
                 {isProgressMet ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
               </div>
               <div className="flex items-center justify-between border-b pb-3">
@@ -79,7 +80,7 @@ export default function CertificatePage() {
                 Every certificate issued by CSDAC contains a unique cryptographic ID number.
               </p>
               <p>
-                Employers and institutions can enter the ID at <span className="font-semibold text-navy-900 ">internships.csdac.in/verify</span> to instantly verify its authenticity.
+                Employers and institutions can enter the ID at <span className="font-semibold text-navy-900 ">www.csdac.in/verify</span> to instantly verify its authenticity.
               </p>
             </CardContent>
           </Card>
@@ -117,11 +118,13 @@ export default function CertificatePage() {
                 </div>
               </CardContent>
               <CardFooter className="flex justify-center gap-4 bg-muted/30 pt-6">
-                <Button className="w-full sm:w-auto">
-                  <Download className="mr-2 h-4 w-4" /> Download PDF
+                <Button className="w-full sm:w-auto" asChild>
+                  <a href={`/api/certificate/download/${certificate.certificateNumber}`} target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-2 h-4 w-4" /> Download PDF
+                  </a>
                 </Button>
                 <Button variant="outline" className="w-full sm:w-auto" asChild>
-                  <Link href={`/verify/${certificate.certificateNumber}`} target="_blank">
+                  <Link href={`https://www.csdac.in/verify`} target="_blank">
                     <ExternalLink className="mr-2 h-4 w-4" /> View Public Link
                   </Link>
                 </Button>

@@ -35,8 +35,9 @@ export async function POST(req: Request) {
       data: {
         certificateNumber,
         issueDate: new Date(),
-        status: 'GENERATED',
-        isVerified: false,
+        status: 'ISSUED',
+        isVerified: true,
+        verifiedAt: new Date(),
         // Manual fields
         manualStudentName: studentName,
         manualCollege: college || null,

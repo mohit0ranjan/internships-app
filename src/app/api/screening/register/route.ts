@@ -25,6 +25,14 @@ const screeningRegistrationSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Check system setting for ALLOW_NEW_REGISTRATIONS
+    const allowSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'ALLOW_NEW_REGISTRATIONS' },
+    });
+    if (allowSetting && allowSetting.value === 'false') {
+      return NextResponse.json({ error: 'New registrations are currently closed by administration.' }, { status: 403 });
+    }
+
     const body = await req.json();
     const parsed = screeningRegistrationSchema.safeParse(body);
 

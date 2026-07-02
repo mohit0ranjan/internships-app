@@ -22,7 +22,34 @@ export async function GET() {
       where: { userId, isRead: false },
     });
 
-    return NextResponse.json({ success: true, notifications, unreadCount });
+    // Fetch active global announcements
+    const announcements = await prisma.announcement.findMany({
+      where: { 
+        isPublished: true,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } }
+        ]
+      },
+      orderBy: { order: 'asc' },
+    });
+
+    // Map announcements to look like notifications for the UI
+    const mappedAnnouncements = announcements.map(ann => ({
+      id: ann.id,
+      title: ann.title,
+      message: ann.body,
+      type: ann.type,
+      isRead: false,
+      createdAt: ann.createdAt,
+      link: null
+    }));
+
+    const allNotifications = [...mappedAnnouncements, ...notifications].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return NextResponse.json({ success: true, notifications: allNotifications, unreadCount });
   } catch (error) {
     console.error('Notification fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

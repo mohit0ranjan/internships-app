@@ -25,6 +25,9 @@ export async function GET(
         },
         internship: {
           select: { title: true, domain: true, centre: true, duration: true }
+        },
+        workspaceAssignment: {
+          include: { project: true }
         }
       }
     });
@@ -36,23 +39,26 @@ export async function GET(
       }, { status: 404 });
     }
 
+    const ws = certificate.workspaceAssignment;
+    const project = ws?.project;
+
     return NextResponse.json({ 
       valid: true, 
       certificate: {
         certificateNumber: certificate.certificateNumber,
         issueDate: certificate.issueDate,
-        studentName: certificate.user?.name || certificate.manualStudentName,
-        college: certificate.user?.college || certificate.manualCollege,
-        degree: certificate.user?.degree || certificate.manualDegree,
-        internshipTitle: certificate.internship?.title || certificate.manualDomain, // Fallback title to domain
-        domain: certificate.internship?.domain || certificate.manualDomain,
-        centre: certificate.internship?.centre || certificate.manualCentre,
-        duration: certificate.internship?.duration || certificate.manualDuration,
-        projectName: certificate.projectName,
-        technology: certificate.technology,
-        grade: certificate.grade,
+        studentName: certificate.user?.name || certificate.manualStudentName || 'N/A',
+        college: certificate.user?.college || certificate.manualCollege || 'N/A',
+        degree: certificate.user?.degree || certificate.manualDegree || 'N/A',
+        internshipTitle: certificate.internship?.title || certificate.manualDomain || 'N/A',
+        domain: certificate.internship?.domain || certificate.manualDomain || 'N/A',
+        centre: certificate.internship?.centre || certificate.manualCentre || 'N/A',
+        duration: certificate.manualDuration || ws?.certificateDuration || ws?.internshipDuration || certificate.internship?.duration || 'N/A',
+        projectName: certificate.projectName || ws?.certificateProjectName || project?.title || 'N/A',
+        technology: certificate.technology || ws?.certificateTechnologies || project?.techStack || 'N/A',
+        grade: certificate.grade || 'A+',
         status: certificate.status,
-        pdfUrl: certificate.pdfUrl || certificate.downloadUrl,
+        pdfUrl: `/api/certificate/download/${certificate.certificateNumber}`,
       }
     });
   } catch (error) {

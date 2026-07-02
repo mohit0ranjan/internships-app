@@ -42,23 +42,35 @@ export async function POST(req: Request) {
     const year = new Date().getFullYear();
     const certNumber = `CSDAC-WBL-${year}-${nanoid(6).toUpperCase()}`;
 
-    // Create certificate record
-    const certificate = await prisma.certificate.create({
-      data: {
-        userId,
-        internshipId,
-        certificateNumber: certNumber,
-        issueDate: new Date(),
-        status: 'ISSUED',
-        isVerified: true,
-        verifiedAt: new Date()
-      }
-    });
-
-    // Update application status
-    await prisma.application.updateMany({
+    const application = await prisma.application.findFirst({
       where: { userId, internshipId },
-      data: { status: 'COMPLETED' }
+      include: { workspaceAssignment: true, project: true, internship: true }
+    });
+    const ws = application?.workspaceAssignment;
+
+    const certificate = await prisma.$transaction(async (tx) => {
+      const cert = await tx.certificate.create({
+        data: {
+          userId,
+          internshipId,
+          certificateNumber: certNumber,
+          projectName: ws?.certificateProjectName || application?.project?.title || 'N/A',
+          technology: ws?.certificateTechnologies || application?.project?.techStack || 'N/A',
+          manualDuration: ws?.certificateDuration || ws?.internshipDuration || application?.internship?.duration,
+          issueDate: new Date(),
+          status: 'ISSUED',
+          isVerified: true,
+          verifiedAt: new Date(),
+          verificationUrl: `/verify/${certNumber}`
+        }
+      });
+
+      await tx.application.updateMany({
+        where: { userId, internshipId },
+        data: { status: 'COMPLETED' }
+      });
+
+      return cert;
     });
 
     return NextResponse.json({

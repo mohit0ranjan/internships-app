@@ -58,3 +58,62 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, title, body: content, type, isPublished, order } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Announcement ID required' }, { status: 400 });
+    }
+
+    const announcement = await prisma.announcement.update({
+      where: { id },
+      data: {
+        title,
+        body: content,
+        type,
+        isPublished,
+        order,
+        publishedAt: isPublished ? new Date() : null,
+      },
+    });
+
+    return NextResponse.json({ success: true, announcement });
+  } catch (error) {
+    console.error('CMS update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const session = await auth();
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Announcement ID required' }, { status: 400 });
+    }
+
+    await prisma.announcement.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('CMS delete error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+

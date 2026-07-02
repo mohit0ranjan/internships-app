@@ -21,11 +21,11 @@ export default function CalendarPage() {
 
   const attendanceHistory = data?.history || []
   
-  // Extract unique present dates in YYYY-MM-DD format
+  // Extract unique present dates in YYYY-MM-DD format local time
   const presentDates = new Set(
     attendanceHistory
       .filter((record: any) => record.status === 'PRESENT')
-      .map((record: any) => new Date(record.date).toISOString().split('T')[0])
+      .map((record: any) => new Date(record.date).toLocaleDateString('en-CA'))
   )
 
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
@@ -52,9 +52,10 @@ export default function CalendarPage() {
 
     // Days of current month
     for (let i = 1; i <= daysInMonth; i++) {
-      const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), i).toISOString().split('T')[0]
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), i)
+      const dateStr = d.toLocaleDateString('en-CA')
       const isPresent = presentDates.has(dateStr)
-      const isToday = new Date().toISOString().split('T')[0] === dateStr
+      const isToday = new Date().toLocaleDateString('en-CA') === dateStr
 
       days.push(
         <div 

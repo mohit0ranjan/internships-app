@@ -31,17 +31,12 @@ export async function GET() {
       where: { userId, status: 'PRESENT' },
     });
 
-    // Estimate enrolled days from the user's earliest attendance or application
-    const firstAttendance = await prisma.attendance.findFirst({
-      where: { userId },
-      orderBy: { date: 'asc' },
+    const totalAbsent = await prisma.attendance.count({
+      where: { userId, status: 'ABSENT' },
     });
 
-    const totalDaysEnrolled = firstAttendance
-      ? Math.ceil((Date.now() - new Date(firstAttendance.date).getTime()) / (1000 * 60 * 60 * 24)) + 1
-      : 0;
+    const totalDaysEnrolled = totalPresent + totalAbsent;
 
-    const absent = Math.max(0, totalDaysEnrolled - totalPresent);
     const percentage = totalDaysEnrolled > 0 ? Math.round((totalPresent / totalDaysEnrolled) * 100) : 0;
 
     return NextResponse.json({
@@ -49,7 +44,7 @@ export async function GET() {
       stats: {
         totalDaysEnrolled,
         present: totalPresent,
-        absent,
+        absent: totalAbsent,
         percentage,
       },
       history: attendance,
@@ -90,9 +85,16 @@ export async function POST() {
       return NextResponse.json({ error: 'Already checked in today' }, { status: 400 });
     }
 
+    // Get workspace assignment for linkage
+    const application = await prisma.application.findFirst({
+      where: { userId: session.user.id, status: { in: ['JOINED', 'COMPLETED'] } },
+      include: { workspaceAssignment: true }
+    });
+
     const attendance = await prisma.attendance.create({
       data: {
         userId: session.user.id,
+        workspaceAssignmentId: application?.workspaceAssignment?.id || null,
         date: today,
         status: 'PRESENT',
         checkInTime: new Date(),

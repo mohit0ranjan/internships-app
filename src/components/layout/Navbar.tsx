@@ -38,7 +38,7 @@ export default function Navbar() {
         <div className="container mx-auto px-6 lg:px-10 py-2 flex items-center justify-between text-xs text-gray-600">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="font-medium">Govt. of India</span>
+              <span className="font-medium text-transparent">Independent</span>
             </div>
           </div>
 
@@ -97,10 +97,9 @@ export default function Navbar() {
             ))}
           </ul>
 
-          {/* Actions */}
           <div className="flex items-center gap-4">
             <Link
-              href="/login"
+              href="https://internship.csdac.in/login"
               className="hidden md:flex items-center justify-center bg-primary-600 text-white px-6 py-2.5 rounded-full text-[13px] font-bold hover:bg-primary-700 hover:shadow-md transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
             >
               Login
@@ -143,7 +142,7 @@ export default function Navbar() {
             ))}
             <li className="mt-4 pt-4 border-t border-gray-100 md:hidden">
               <Link
-                href="/login"
+                href="https://internship.csdac.in/login"
                 className="block text-center w-full bg-primary-600 text-white px-6 py-3 rounded-xl text-[14px] font-bold hover:bg-primary-700 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >

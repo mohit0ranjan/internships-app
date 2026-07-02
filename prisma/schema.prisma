@@ -104,17 +104,19 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  applications    Application[]
-  attendances     Attendance[]
-  weeklyProgress  WeeklyProgress[]
-  certificates    Certificate[]
-  supportTickets  SupportTicket[]
-  messages        TicketMessage[]
-  notifications   Notification[]
-  batches         Batch[]          @relation("UserBatches")
-  auditLogs       AuditLog[]
-  loginHistory    LoginHistory[]
-  candidateProfile CandidateProfile?
+  applications         Application[]
+  attendances          Attendance[]
+  weeklyProgress       WeeklyProgress[]
+  certificates         Certificate[]
+  supportTickets       SupportTicket[]
+  messages             TicketMessage[]
+  notifications        Notification[]
+  batches              Batch[]               @relation("UserBatches")
+  auditLogs            AuditLog[]
+  loginHistory         LoginHistory[]
+  candidateProfile     CandidateProfile?
+  workspaceAssignments WorkspaceAssignment[]
+  mentoring            Mentor?               @relation("UserMentor")
 
   @@index([role])
   @@index([isActive])
@@ -125,10 +127,11 @@ model LoginHistory {
   userId    String
   ipAddress String?
   userAgent String?
-  status    String   // SUCCESS, FAILED
+  status    String // SUCCESS, FAILED
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
@@ -142,6 +145,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
@@ -188,11 +192,12 @@ model Application {
   updatedAt      DateTime          @updatedAt
   projectId      String?
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Restrict)
-  project    Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  payment    Payment?
-  assessmentAttempt AssessmentAttempt?
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  internship          Internship           @relation(fields: [internshipId], references: [id], onDelete: Restrict)
+  project             Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payment             Payment?
+  assessmentAttempt   AssessmentAttempt?
+  workspaceAssignment WorkspaceAssignment?
 
   @@unique([userId, internshipId])
   @@index([userId])
@@ -201,22 +206,88 @@ model Application {
   @@index([projectId])
 }
 
-model Project {
-  id            String   @id @default(cuid())
-  title         String
-  description   String   @db.Text
-  internshipId  String
-  mentorName    String?
-  mentorEmail   String?
-  githubRepoUrl String?
-  techStack     String?
-  status        String   @default("ACTIVE")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model WorkspaceAssignment {
+  id            String @id @default(cuid())
+  applicationId String @unique
+  userId        String
 
-  internship     Internship       @relation(fields: [internshipId], references: [id], onDelete: Restrict)
-  applications   Application[]
-  weeklyProgress WeeklyProgress[]
+  // Credentials
+  credentialStatus    String    @default("ACTIVE") // ACTIVE, DISABLED
+  passwordLastResetAt DateTime?
+
+  // Relations
+  projectId String?
+  batchId   String?
+  mentorId  String?
+
+  // Internship Info
+  internshipTitle        String?
+  internshipType         String?
+  internshipDuration     String?
+  startDate              DateTime?
+  endDate                DateTime?
+  numberOfWeeks          Int?
+  workingDays            String?
+  expectedCompletionDate DateTime?
+  mode                   String?
+
+  // Certificate Info (Assignment specific overrides/prefills)
+  certificateTitle          String?
+  certificateProjectName    String?
+  certificateDuration       String?
+  certificateDescription    String? @db.Text
+  certificateSkills         String?
+  certificateTechnologies   String?
+  certificateIssueAuthority String?
+  certificateRemarks        String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  batch       Batch?      @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  mentor      Mentor?     @relation(fields: [mentorId], references: [id], onDelete: SetNull)
+
+  attendances          Attendance[]
+  weeklyProgress       WeeklyProgress[]
+  certificates         Certificate[]
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([projectId])
+  @@index([batchId])
+  @@index([mentorId])
+}
+
+model Project {
+  id                   String   @id @default(cuid())
+  title                String
+  description          String   @db.Text
+  domain               String?
+  difficulty           String?
+  documentationUrl     String?
+  programmingLanguages String?
+  frameworks           String?
+  database             String?
+  tools                String?
+  expectedDeliverables String?  @db.Text
+  submissionMethod     String?
+  completionCriteria   String?  @db.Text
+  internshipId         String?
+  mentorName           String?
+  mentorEmail          String?
+  githubRepoUrl        String?
+  techStack            String?
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  internship           Internship?           @relation(fields: [internshipId], references: [id], onDelete: SetNull)
+  applications         Application[]
+  weeklyProgress       WeeklyProgress[]
+  workspaceAssignments WorkspaceAssignment[]
 
   @@index([internshipId])
 }
@@ -225,7 +296,7 @@ model Payment {
   id            String        @id @default(cuid())
   applicationId String        @unique
   orderId       String?       @unique
-  amount        Decimal       @db.Decimal(10,2)
+  amount        Decimal       @db.Decimal(10, 2)
   status        PaymentStatus @default(PENDING)
   method        String?
   transactionId String?       @unique
@@ -234,6 +305,7 @@ model Payment {
   updatedAt     DateTime      @updatedAt
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
   @@index([status])
 }
 
@@ -249,6 +321,9 @@ model Attendance {
   updatedAt    DateTime         @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  workspaceAssignmentId String?
+  workspaceAssignment   WorkspaceAssignment? @relation(fields: [workspaceAssignmentId], references: [id], onDelete: SetNull)
 
   @@unique([userId, date])
   @@index([date])
@@ -268,6 +343,9 @@ model WeeklyProgress {
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  workspaceAssignmentId String?
+  workspaceAssignment   WorkspaceAssignment? @relation(fields: [workspaceAssignmentId], references: [id], onDelete: SetNull)
 
   @@unique([userId, projectId, weekNumber])
   @@index([status])
@@ -299,6 +377,9 @@ model Certificate {
 
   user       User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   internship Internship? @relation(fields: [internshipId], references: [id], onDelete: Restrict)
+  
+  workspaceAssignmentId String?
+  workspaceAssignment   WorkspaceAssignment? @relation(fields: [workspaceAssignmentId], references: [id], onDelete: SetNull)
 
   @@unique([userId, internshipId])
   @@index([userId])
@@ -359,7 +440,11 @@ model Notification {
 model Batch {
   id           String      @id @default(cuid())
   name         String      @unique
-  internshipId String
+  code         String?     @unique
+  description  String?     @db.Text
+  coordinator  String?
+  maxStudents  Int?
+  internshipId String?
   startDate    DateTime
   endDate      DateTime
   isActive     Boolean     @default(true)
@@ -367,8 +452,9 @@ model Batch {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
-  students   User[]     @relation("UserBatches")
+  internship           Internship?           @relation(fields: [internshipId], references: [id], onDelete: SetNull)
+  students             User[]                @relation("UserBatches")
+  workspaceAssignments WorkspaceAssignment[]
 
   @@index([internshipId])
 }
@@ -378,8 +464,8 @@ model EmailTemplate {
   name      String   @unique
   subject   String
   body      String   @db.Text
-  variables String   // Comma-separated list of variables like {{name}}, {{email}}
-  type      String   // e.g., "WELCOME", "CREDENTIALS", "SHORTLISTED"
+  variables String // Comma-separated list of variables like {{name}}, {{email}}
+  type      String // e.g., "WELCOME", "CREDENTIALS", "SHORTLISTED"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -389,7 +475,7 @@ model CMSContent {
   slug        String   @unique
   title       String
   content     String   @db.Text
-  section     String   // e.g., "FAQ", "PROGRAMME"
+  section     String // e.g., "FAQ", "PROGRAMME"
   isPublished Boolean  @default(true)
   order       Int      @default(0)
   createdAt   DateTime @default(now())
@@ -399,16 +485,16 @@ model CMSContent {
 }
 
 model Announcement {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
-  body        String   @db.Text
-  type        String   @default("INFO") // INFO | WARNING | IMPORTANT
-  isPublished Boolean  @default(false)
+  body        String    @db.Text
+  type        String    @default("INFO") // INFO | WARNING | IMPORTANT
+  isPublished Boolean   @default(false)
   publishedAt DateTime?
   expiresAt   DateTime?
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([isPublished])
   @@index([publishedAt])
@@ -425,71 +511,77 @@ model SystemSetting {
 }
 
 model CandidateProfile {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  university       String?
-  graduationYear   String?
-  cgpa             String?
-  city             String?
-  state            String?
-  linkedinUrl      String?
-  preferredDomain  String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  university      String?
+  graduationYear  String?
+  cgpa            String?
+  city            String?
+  state           String?
+  linkedinUrl     String?
+  preferredDomain String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Assessment {
-  id          String   @id @default(cuid())
-  title       String
-  duration    Int      // in minutes
-  totalMarks  Int
+  id           String   @id @default(cuid())
+  title        String
+  duration     Int // in minutes
+  totalMarks   Int
   passingMarks Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  questions   AssessmentQuestion[]
-  attempts    AssessmentAttempt[]
+  questions AssessmentQuestion[]
+  attempts  AssessmentAttempt[]
 }
 
 model AssessmentQuestion {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   assessmentId  String
-  question      String   @db.Text
-  options       String   @db.Text // JSON string array
+  question      String  @db.Text
+  options       String  @db.Text // JSON string array
   correctAnswer String
-  explanation   String?  @db.Text
-  difficulty    String   // EASY, MEDIUM, HARD
+  explanation   String? @db.Text
+  difficulty    String // EASY, MEDIUM, HARD
   topic         String
-  marks         Int      @default(1)
-  negativeMarks Float    @default(0)
-  
-  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  marks         Int     @default(1)
+  negativeMarks Float   @default(0)
+
+  assessment Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  answers    AssessmentAnswer[]
+
+  @@index([assessmentId])
 }
 
 model AssessmentAttempt {
-  id              String   @id @default(cuid())
-  applicationId   String   @unique
+  id              String    @id @default(cuid())
+  applicationId   String    @unique
   assessmentId    String
-  startTime       DateTime @default(now())
+  startTime       DateTime  @default(now())
   endTime         DateTime?
-  status          String   @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, TIMEOUT, TERMINATED
+  status          String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, TIMEOUT, TERMINATED
   score           Float?
   percentage      Float?
   correctCount    Int?
   wrongCount      Int?
   skippedCount    Int?
-  timeTaken       Int?     // in seconds
-  tabSwitches     Int      @default(0)
-  fullscreenExits Int      @default(0)
-  warnings        Int      @default(0)
-  
-  assessment      Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  application     Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  answers         AssessmentAnswer[]
-  violations      AssessmentViolation[]
+  timeTaken       Int? // in seconds
+  tabSwitches     Int       @default(0)
+  fullscreenExits Int       @default(0)
+  warnings        Int       @default(0)
+
+  assessment  Assessment            @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  application Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  answers     AssessmentAnswer[]
+  violations  AssessmentViolation[]
+
+  @@index([assessmentId])
+  @@index([applicationId])
 }
 
 model AssessmentAnswer {
@@ -498,16 +590,40 @@ model AssessmentAnswer {
   questionId     String
   selectedOption String?
   isCorrect      Boolean?
-  timeTaken      Int?     // in seconds
-  
-  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  timeTaken      Int? // in seconds
+
+  attempt  AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId])
+  @@index([questionId])
 }
 
 model AssessmentViolation {
-  id          String   @id @default(cuid())
-  attemptId   String
-  type        String   // TAB_SWITCH, FULLSCREEN_EXIT, BLUR
-  timestamp   DateTime @default(now())
+  id        String   @id @default(cuid())
+  attemptId String
+  type      String // TAB_SWITCH, FULLSCREEN_EXIT, BLUR
+  timestamp DateTime @default(now())
 
-  attempt     AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attempt AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+}
+
+model Mentor {
+  id          String   @id @default(cuid())
+  userId      String?  @unique // Optional link to a user account
+  name        String
+  email       String?
+  phone       String?
+  department  String?
+  role        String?
+  maxStudents Int?
+  notes       String?  @db.Text
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user                 User?                 @relation("UserMentor", fields: [userId], references: [id], onDelete: SetNull)
+  workspaceAssignments WorkspaceAssignment[]
 }

@@ -13,14 +13,12 @@ export default function ProjectPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/student/project')
   
   const [githubUrl, setGithubUrl] = useState("")
-  const [liveUrl, setLiveUrl] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   // Sync state with data when it loads
-  if (data?.project && !isEditing && (githubUrl === "" && liveUrl === "")) {
+  if (data?.project && !isEditing && (githubUrl === "")) {
     if (data.project.githubUrl) setGithubUrl(data.project.githubUrl)
-    if (data.project.liveUrl) setLiveUrl(data.project.liveUrl)
   }
 
   const handleSave = async () => {
@@ -30,8 +28,7 @@ export default function ProjectPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          githubUrl: githubUrl.trim() || undefined, 
-          liveUrl: liveUrl.trim() || undefined 
+          githubUrl: githubUrl.trim() || undefined
         })
       });
       const result = await res.json();
@@ -75,7 +72,12 @@ export default function ProjectPage() {
     )
   }
 
-  const techStack = project.techStack ? JSON.parse(project.techStack) : [];
+  let techStack = [];
+  try {
+    techStack = project.techStack ? JSON.parse(project.techStack) : [];
+  } catch (e) {
+    techStack = project.techStack ? project.techStack.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -144,27 +146,12 @@ export default function ProjectPage() {
                 </div>
                 {isEditing && <p className="text-xs text-muted-foreground">Make sure the repository is public or you have invited your mentor.</p>}
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Live Deployment URL (Optional)</label>
-                <div className="flex relative">
-                  <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="https://my-project.vercel.app" 
-                    className="pl-9" 
-                    disabled={!isEditing}
-                    value={liveUrl}
-                    onChange={(e) => setLiveUrl(e.target.value)}
-                  />
-                </div>
-              </div>
             </CardContent>
             {isEditing && (
               <CardFooter className="flex justify-end gap-2 border-t pt-4">
                 <Button variant="outline" onClick={() => {
                   setIsEditing(false);
                   setGithubUrl(project.githubUrl || "");
-                  setLiveUrl(project.liveUrl || "");
                 }}>Cancel</Button>
                 <Button onClick={handleSave} disabled={isSaving}>
                   {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save Changes

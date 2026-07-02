@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Plus, Megaphone, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Megaphone, CheckCircle2, XCircle, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
@@ -17,6 +16,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export default function CMSPage() {
   const { data, error, isLoading, mutate } = useSWR("/api/admin/cms", fetcher);
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     body: "",
@@ -25,28 +25,66 @@ export default function CMSPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData({ title: "", body: "", type: "INFO", isPublished: true });
+    setIsOpen(true);
+  };
+
+  const openEdit = (announcement: any) => {
+    setEditingId(announcement.id);
+    setFormData({
+      title: announcement.title,
+      body: announcement.body,
+      type: announcement.type,
+      isPublished: announcement.isPublished,
+    });
+    setIsOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/admin/cms", {
-        method: "POST",
+      const url = "/api/admin/cms";
+      const method = editingId ? "PATCH" : "POST";
+      const bodyPayload = editingId ? { ...formData, id: editingId } : formData;
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(bodyPayload),
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to create announcement");
+      if (!res.ok) throw new Error(json.error || "Failed to save announcement");
 
-      toast.success("Announcement created successfully");
+      toast.success(editingId ? "Announcement updated successfully" : "Announcement created successfully");
       setIsOpen(false);
-      setFormData({ title: "", body: "", type: "INFO", isPublished: true });
       mutate();
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+
+    try {
+      const res = await fetch(`/api/admin/cms?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to delete announcement");
+
+      toast.success("Announcement deleted successfully");
+      mutate();
+    } catch (err: any) {
+      toast.error(err.message);
     }
   };
 
@@ -63,13 +101,13 @@ export default function CMSPage() {
           <p className="text-navy-500  mt-1">Manage homepage announcements and public content.</p>
         </div>
         
-        <Button className="gap-2" onClick={() => setIsOpen(true)}>
+        <Button className="gap-2" onClick={openCreate}>
           <Plus className="w-4 h-4" /> New Announcement
         </Button>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent onClose={() => setIsOpen(false)}>
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Announcement</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Announcement" : "Create Announcement"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -88,7 +126,7 @@ export default function CMSPage() {
                   id="type"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="INFO">Information</option>
                   <option value="IMPORTANT">Important</option>
@@ -119,7 +157,7 @@ export default function CMSPage() {
               <div className="pt-4 flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating..." : "Create"}
+                  {isSubmitting ? "Saving..." : editingId ? "Update" : "Create"}
                 </Button>
               </div>
             </form>
@@ -144,8 +182,8 @@ export default function CMSPage() {
           ) : (
             <div className="space-y-4">
               {announcements.map((announcement: any) => (
-                <div key={announcement.id} className="flex items-start justify-between p-4 bg-white border border-navy-100 rounded-lg shadow-sm">
-                  <div className="space-y-1">
+                <div key={announcement.id} className="flex flex-col sm:flex-row sm:items-start justify-between p-4 bg-white border border-navy-100 rounded-lg shadow-sm gap-4">
+                  <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-navy-900">{announcement.title}</h3>
                       <Badge variant="outline" className={
@@ -161,7 +199,7 @@ export default function CMSPage() {
                       Created on {new Date(announcement.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-4">
                     {announcement.isPublished ? (
                       <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
                         <CheckCircle2 className="w-4 h-4" /> Published
@@ -171,6 +209,14 @@ export default function CMSPage() {
                         <XCircle className="w-4 h-4" /> Draft
                       </span>
                     )}
+                    <div className="flex items-center gap-2 border-l pl-4 border-navy-100">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(announcement)} className="text-navy-600 hover:text-navy-900">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(announcement.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -13,13 +13,18 @@ export async function GET() {
 
     // Get active application/internship
     const application = await prisma.application.findFirst({
-      where: { 
-        userId,
-        status: { in: ['SELECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'] }
-      },
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
       include: { 
         internship: true,
         project: true,
+        workspaceAssignment: {
+          include: {
+            project: true,
+            batch: true,
+            mentor: true
+          }
+        },
         user: { select: { name: true, email: true } }
       }
     });
@@ -35,9 +40,10 @@ export async function GET() {
 
     // Get progress count (safe — guard against null projectId)
     let progressCount = 0;
-    if (application.projectId) {
+    const projectId = application.workspaceAssignment?.projectId || application.projectId;
+    if (projectId) {
       progressCount = await prisma.weeklyProgress.count({
-        where: { userId, projectId: application.projectId }
+        where: { userId, projectId: projectId }
       });
     }
 

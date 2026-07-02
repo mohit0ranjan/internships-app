@@ -115,7 +115,9 @@ export async function POST(req: NextRequest) {
       where: { id: applicationId },
       include: {
         user: true,
-        internship: true
+        internship: true,
+        workspaceAssignment: true,
+        project: true
       }
     });
 
@@ -124,26 +126,43 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate unique cert number
+    const currentYear = new Date().getFullYear();
     const uniqueSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const certNumber = `CSDAC-WBL-2026-${uniqueSuffix}`;
+    const certNumber = `CSDAC-WBL-${currentYear}-${uniqueSuffix}`;
 
-    // Create the certificate
-    const certificate = await prisma.certificate.create({
-      data: {
-        userId: application.userId,
-        internshipId: application.internshipId,
-        certificateNumber: certNumber,
-        issueDate: new Date(),
-        status: "GENERATED"
-      },
-      include: {
-        user: {
-          select: { name: true, email: true }
+    const ws = application.workspaceAssignment;
+
+    const certificate = await prisma.$transaction(async (tx) => {
+      const cert = await tx.certificate.create({
+        data: {
+          userId: application.userId,
+          internshipId: application.internshipId,
+          certificateNumber: certNumber,
+          projectName: ws?.certificateProjectName || application.project?.title || 'N/A',
+          technology: ws?.certificateTechnologies || application.project?.techStack || 'N/A',
+          manualDuration: ws?.certificateDuration || ws?.internshipDuration || application.internship.duration,
+          issueDate: new Date(),
+          status: "ISSUED",
+          isVerified: true,
+          verifiedAt: new Date(),
+          verificationUrl: `/verify/${certNumber}`
         },
-        internship: {
-          select: { title: true }
+        include: {
+          user: {
+            select: { name: true, email: true }
+          },
+          internship: {
+            select: { title: true }
+          }
         }
-      }
+      });
+
+      await tx.application.update({
+        where: { id: applicationId },
+        data: { status: 'COMPLETED' }
+      });
+
+      return cert;
     });
 
     return NextResponse.json({ 

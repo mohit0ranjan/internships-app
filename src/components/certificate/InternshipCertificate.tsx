@@ -31,7 +31,7 @@ export function InternshipCertificate({
   trainingHeadName = "Training Head",
   trainingHeadDesignation = "Designation"
 }: InternshipCertificateProps) {
-  const verificationUrl = `https://verify.csdac.in/${certificateId}`;
+  const verificationUrl = `https://csdac.in/verify/${certificateId}`;
   
   return (
     <div className="flex justify-center items-center p-8 min-h-screen bg-slate-900 print:p-0 print:bg-white print:min-h-0 print:block">
@@ -231,7 +231,7 @@ export function InternshipCertificate({
           </div>
           
           <div className="text-center mt-[5px] text-[#ccc] text-[6.5px] tracking-[2.5px] uppercase" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-            Verify Authenticity at &nbsp; verify.csdac.in/{certificateId}
+            Verify Authenticity at &nbsp; csdac.in/verify/{certificateId}
           </div>
           
         </div>

@@ -60,9 +60,37 @@ export default function ApplicantsPage() {
   if (searchQuery) {
     filteredApplicants = filteredApplicants.filter((a: any) => 
       a.user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      a.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+      a.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.user.candidateProfile?.college && a.user.candidateProfile.college.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }
+
+  const handleExportCSV = () => {
+    if (filteredApplicants.length === 0) {
+      toast.error('No applicants to export');
+      return;
+    }
+    const headers = ['ID', 'Name', 'Email', 'College', 'Domain', 'Applied Date', 'Score', 'Status'];
+    const rows = filteredApplicants.map((app: any) => [
+      app.id,
+      app.user.name,
+      app.user.email,
+      app.user.college || app.user.candidateProfile?.university || 'N/A',
+      app.internship.domain,
+      new Date(app.createdAt).toLocaleDateString(),
+      app.screeningScore || 'Pending',
+      app.status
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map((e: any[]) => e.map((cell: any) => `"${cell}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `applicants_export_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV exported successfully');
+  };
 
   return (
     <div className="space-y-6">
@@ -72,7 +100,7 @@ export default function ApplicantsPage() {
           <p className="text-muted-foreground">Review, shortlist, and manage internship applications.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+          <Button variant="outline" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
         </div>
       </div>
 
@@ -106,6 +134,7 @@ export default function ApplicantsPage() {
               <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                 <tr>
                   <th className="px-4 py-3 rounded-tl-lg">Applicant Details</th>
+                  <th className="px-4 py-3">College Name</th>
                   <th className="px-4 py-3">Domain</th>
                   <th className="px-4 py-3">Applied Date</th>
                   <th className="px-4 py-3">Score</th>
@@ -116,17 +145,17 @@ export default function ApplicantsPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8">
+                    <td colSpan={7} className="text-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-600" />
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-red-500">Failed to load applicants</td>
+                    <td colSpan={7} className="text-center py-8 text-red-500">Failed to load applicants</td>
                   </tr>
                 ) : filteredApplicants.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted-foreground">No applicants found.</td>
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">No applicants found.</td>
                   </tr>
                 ) : (
                   filteredApplicants.map((app: any) => (
@@ -135,6 +164,9 @@ export default function ApplicantsPage() {
                         <div className="font-medium text-navy-900 ">{app.user.name}</div>
                         <div className="text-xs text-muted-foreground">{app.user.email}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">ID: {app.id}</div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="font-medium text-slate-700">{app.user.college || app.user.candidateProfile?.university || 'N/A'}</div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="font-medium">{app.internship.domain}</div>

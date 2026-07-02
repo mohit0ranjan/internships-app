@@ -14,8 +14,14 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
     const internshipId = searchParams.get('internshipId');
 
-    const filter: Record<string, string> = {};
-    if (status) filter.status = status;
+    const filter: any = {};
+    if (status) {
+      if (status.includes(',')) {
+        filter.status = { in: status.split(',') };
+      } else {
+        filter.status = status;
+      }
+    }
     if (internshipId) filter.internshipId = internshipId;
 
     const applicants = await prisma.application.findMany({
@@ -23,10 +29,16 @@ export async function GET(req: Request) {
       include: {
         user: {
           include: {
-            batches: true
+            batches: true,
+            candidateProfile: true
           }
         },
         internship: true,
+        workspaceAssignment: {
+          include: {
+            batch: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -61,6 +73,23 @@ export async function PUT(req: Request) {
     }
 
     const { id, status } = parsed.data;
+
+    if (status === 'JOINED' || status === 'COMPLETED') {
+      const app = await prisma.application.findUnique({
+        where: { id },
+        include: { workspaceAssignment: true }
+      });
+
+      if (!app) {
+        return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+      }
+
+      if (!app.workspaceAssignment) {
+        return NextResponse.json({ 
+          error: 'Cannot update status to JOINED or COMPLETED. Please assign a Workspace first.' 
+        }, { status: 400 });
+      }
+    }
 
     const application = await prisma.application.update({
       where: { id },

@@ -82,10 +82,24 @@ export async function POST(req: Request) {
         status: status || undefined,
         updatedAt: new Date()
       },
-      include: { messages: true }
+      include: { 
+        user: true,
+        messages: {
+          orderBy: { timestamp: 'asc' }
+        } 
+      }
     });
 
-    return NextResponse.json({ success: true, ticket });
+    const mappedTicket = {
+      ...ticket,
+      messages: ticket.messages.map(msg => ({
+        ...msg,
+        message: msg.content,
+        createdAt: msg.timestamp,
+      }))
+    };
+
+    return NextResponse.json({ success: true, ticket: mappedTicket });
   } catch (error) {
     console.error('Ticket reply error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

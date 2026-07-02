@@ -21,15 +21,17 @@ export async function GET() {
     // Auto-detect project from user's active application
     const application = await prisma.application.findFirst({
       where: { userId, status: { in: ['SELECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'] } },
-      include: { project: true }
+      include: { workspaceAssignment: true, project: true }
     });
 
-    if (!application?.projectId) {
+    const projectId = application?.workspaceAssignment?.projectId || application?.projectId;
+
+    if (!application || !projectId) {
       return NextResponse.json({ progress: [], currentWeek: 1 });
     }
 
     const progress = await prisma.weeklyProgress.findMany({
-      where: { userId, projectId: application.projectId },
+      where: { userId, projectId: projectId },
       orderBy: { weekNumber: 'desc' },
     });
 
@@ -62,9 +64,13 @@ export async function POST(req: Request) {
     // Auto-detect projectId from user's application
     const application = await prisma.application.findFirst({
       where: { userId: session.user.id, status: { in: ['JOINED', 'COMPLETED'] } },
+      include: { workspaceAssignment: true }
     });
 
-    if (!application?.projectId) {
+    const projectId = application?.workspaceAssignment?.projectId || application?.projectId;
+    const workspaceAssignmentId = application?.workspaceAssignment?.id;
+
+    if (!application || !projectId) {
       return NextResponse.json({ error: 'No project assigned. Cannot submit progress.' }, { status: 400 });
     }
 
@@ -73,7 +79,7 @@ export async function POST(req: Request) {
       where: {
         userId_projectId_weekNumber: {
           userId: session.user.id,
-          projectId: application.projectId,
+          projectId: projectId,
           weekNumber,
         },
       },
@@ -86,7 +92,8 @@ export async function POST(req: Request) {
     const progress = await prisma.weeklyProgress.create({
       data: {
         userId: session.user.id,
-        projectId: application.projectId,
+        projectId: projectId,
+        workspaceAssignmentId: workspaceAssignmentId || null,
         weekNumber,
         summary,
         githubLink: githubUrl || null,

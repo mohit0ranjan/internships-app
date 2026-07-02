@@ -22,26 +22,33 @@ export async function GET() {
       },
       include: { 
         project: true,
+        workspaceAssignment: {
+          include: {
+            project: true,
+            mentor: true
+          }
+        },
         internship: { select: { title: true, domain: true, centre: true, duration: true } }
       }
     });
 
-    if (!application || !application.project) {
+    const project = application?.workspaceAssignment?.project || application?.project;
+    if (!application || !project) {
       return NextResponse.json({ internship: application?.internship || null, project: null, mentor: null });
     }
 
-    // Build mentor info from project
-    const mentor = application.project.mentorName ? {
-      name: application.project.mentorName,
-      email: application.project.mentorEmail || '',
-    } : null;
+    // Build mentor info
+    const mentor = application?.workspaceAssignment?.mentor || (project.mentorName ? {
+      name: project.mentorName,
+      email: project.mentorEmail || '',
+    } : null);
 
     return NextResponse.json({ 
       internship: application.internship,
       project: {
-        ...application.project,
-        // Map githubRepoUrl to githubUrl for frontend
-        githubUrl: application.project.githubRepoUrl,
+        ...project,
+        // Map githubRepoUrl to githubUrl for frontend, fall back to application.githubLink
+        githubUrl: application.githubLink || project.githubRepoUrl,
         liveUrl: null, // Project model doesn't have liveUrl yet
       },
       mentor,
@@ -72,24 +79,26 @@ export async function PUT(req: Request) {
     const application = await prisma.application.findFirst({
       where: {
         userId: session.user.id,
-        status: { in: ['JOINED', 'COMPLETED'] },
-        projectId: { not: null }
-      }
+        status: { in: ['JOINED', 'COMPLETED'] }
+      },
+      include: { workspaceAssignment: true }
     });
 
-    if (!application?.projectId) {
+    const projectId = application?.workspaceAssignment?.projectId || application?.projectId;
+
+    if (!application || !projectId) {
       return NextResponse.json({ error: 'No project assigned' }, { status: 404 });
     }
 
-    const project = await prisma.project.update({
-      where: { id: application.projectId },
+    // Update Application instead of shared Project to avoid overwriting other students' links
+    await prisma.application.update({
+      where: { id: application.id },
       data: {
-        githubRepoUrl: githubUrl || null,
-        // liveUrl is not in schema yet, so we skip it
+        githubLink: githubUrl || null,
       }
     });
 
-    return NextResponse.json({ success: true, project });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Project update error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -79,24 +79,25 @@ export default function AdminScreeningPage() {
                   <th className="px-4 py-3">Score</th>
                   <th className="px-4 py-3">Started</th>
                   <th className="px-4 py-3">Warnings</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Attempt Status</th>
+                  <th className="px-4 py-3">App Status</th>
                   <th className="px-4 py-3 text-right rounded-tr-lg">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8">
+                    <td colSpan={7} className="text-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-600" />
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-red-500">Failed to load screening data</td>
+                    <td colSpan={7} className="text-center py-8 text-red-500">Failed to load screening data</td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-muted-foreground">No records found.</td>
+                    <td colSpan={7} className="text-center py-8 text-muted-foreground">No records found.</td>
                   </tr>
                 ) : (
                   filtered.map((attempt: any) => (
@@ -128,6 +129,9 @@ export default function AdminScreeningPage() {
                       </td>
                       <td className="px-4 py-4">
                         {getStatusBadge(attempt.status)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge variant="outline" className="bg-slate-50 text-slate-700">{attempt.application?.status || 'SUBMITTED'}</Badge>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">

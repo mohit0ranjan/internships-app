@@ -68,33 +68,38 @@ export default function StudentDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  {data?.application?.project ? (
-                    <div className="space-y-5">
-                      <div>
-                        <h3 className="text-xl font-bold text-navy-900 ">
-                          {data.application.project.title}
-                        </h3>
-                        <p className="text-navy-600  mt-2 leading-relaxed">
-                          {data.application.project.description}
-                        </p>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {data.application.project.techStack ? (
-                          (() => {
-                            let parsed = [];
-                            try {
-                              parsed = JSON.parse(data.application.project.techStack);
-                            } catch {
-                              parsed = data.application.project.techStack.split(',').map((s: string) => s.trim()).filter(Boolean);
-                            }
-                            return Array.isArray(parsed) ? parsed.map((tech: string, i: number) => (
-                              <Badge key={i} variant="secondary" className="bg-navy-100 text-navy-700 hover:bg-navy-200">{tech}</Badge>
-                            )) : null;
-                          })()
-                        ) : <span className="text-sm text-navy-400 font-medium">Tech stack not specified</span>}
-                      </div>
-                    </div>
+                  {data?.application?.workspaceAssignment?.project || data?.application?.project ? (
+                    (() => {
+                      const project = data.application.workspaceAssignment?.project || data.application.project;
+                      return (
+                        <div className="space-y-5">
+                          <div>
+                            <h3 className="text-xl font-bold text-navy-900 ">
+                              {project.title}
+                            </h3>
+                            <p className="text-navy-600  mt-2 leading-relaxed">
+                              {project.description}
+                            </p>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2">
+                            {project.techStack ? (
+                              (() => {
+                                let parsed = [];
+                                try {
+                                  parsed = JSON.parse(project.techStack);
+                                } catch {
+                                  parsed = project.techStack.split(',').map((s: string) => s.trim()).filter(Boolean);
+                                }
+                                return Array.isArray(parsed) ? parsed.map((tech: string, i: number) => (
+                                  <Badge key={i} variant="secondary" className="bg-navy-100 text-navy-700 hover:bg-navy-200">{tech}</Badge>
+                                )) : null;
+                              })()
+                            ) : <span className="text-sm text-navy-400 font-medium">Tech stack not specified</span>}
+                          </div>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="text-center py-8">
                       <div className="w-16 h-16 bg-navy-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -108,7 +113,7 @@ export default function StudentDashboard() {
                   )}
                 </CardContent>
                 <CardFooter className="bg-navy-50/50  border-t border-navy-50 p-4">
-                  <Button variant="default" className="w-full sm:w-auto" asChild disabled={!data?.application?.project}>
+                  <Button variant="default" className="w-full sm:w-auto" asChild disabled={!(data?.application?.workspaceAssignment?.project || data?.application?.project)}>
                     <Link href="/student/project">
                       Open Project Workspace <ArrowRight className="h-4 w-4 ml-2" />
                     </Link>
@@ -131,9 +136,9 @@ export default function StudentDashboard() {
                       <span className="text-sm font-medium text-navy-500">days present</span>
                     </div>
                     <div className="w-full bg-navy-100 h-2 rounded-full mt-4 overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(((data?.attendanceCount || 0) / 90) * 100, 100)}%` }}></div>
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(((data?.attendanceCount || 0) / (parseInt(data?.application?.workspaceAssignment?.internshipDuration || data?.application?.internship?.duration || "3") * 30 || 90)) * 100, 100)}%` }}></div>
                     </div>
-                    <p className="text-xs text-navy-400 mt-2 text-right">Target: 90 days</p>
+                    <p className="text-xs text-navy-400 mt-2 text-right">Target: {parseInt(data?.application?.workspaceAssignment?.internshipDuration || data?.application?.internship?.duration || "3") * 30 || 90} days</p>
                   </CardContent>
                 </Card>
 
@@ -182,7 +187,7 @@ export default function StudentDashboard() {
                       </div>
                       <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700" asChild>
                         <Link href={`/verify/${data.certificate.certificateNumber}`} target="_blank">
-                          <Download className="w-4 h-4" /> Download Certificate
+                          <Download className="w-4 h-4" /> Download / Verify Certificate
                         </Link>
                       </Button>
                     </div>
@@ -198,7 +203,7 @@ export default function StudentDashboard() {
                         </p>
                       </div>
                       <div className="w-full bg-navy-200 h-1.5 rounded-full overflow-hidden mt-4">
-                        <div className="bg-navy-400 h-full rounded-full" style={{ width: `${Math.min(((data?.attendanceCount || 0) / 90) * 100, 100)}%` }}></div>
+                        <div className="bg-navy-400 h-full rounded-full" style={{ width: `${Math.min(((data?.attendanceCount || 0) / (parseInt(data?.application?.workspaceAssignment?.internshipDuration || data?.application?.internship?.duration || "3") * 30 || 90)) * 100, 100)}%` }}></div>
                       </div>
                     </div>
                   )}
@@ -213,36 +218,8 @@ export default function StudentDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="divide-y divide-navy-50">
-                    <a href="#" className="flex items-start gap-3 p-4 hover:bg-navy-50 transition-colors group">
-                      <div className="w-8 h-8 rounded bg-primary-50 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
-                        <MonitorPlay className="w-4 h-4 text-primary-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-navy-900  group-hover:text-primary-600 transition-colors">Orientation Video</h4>
-                        <p className="text-xs text-navy-500 mt-0.5">Introduction to CSDAC WBL.</p>
-                      </div>
-                    </a>
-                    <a href="#" className="flex items-start gap-3 p-4 hover:bg-navy-50 transition-colors group">
-                      <div className="w-8 h-8 rounded bg-accent-50 flex items-center justify-center shrink-0 group-hover:bg-accent-100 transition-colors">
-                        <FileText className="w-4 h-4 text-accent-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-navy-900  group-hover:text-accent-600 transition-colors">Coding Guidelines</h4>
-                        <p className="text-xs text-navy-500 mt-0.5">Standard practices for Govt projects.</p>
-                      </div>
-                    </a>
-                    <div className="flex items-start gap-3 p-4 opacity-50 cursor-not-allowed">
-                      <div className="w-8 h-8 rounded bg-navy-100 flex items-center justify-center shrink-0">
-                        <Lock className="w-4 h-4 text-navy-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-navy-900  flex items-center gap-2">
-                          Advanced Modules <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">LOCKED</Badge>
-                        </h4>
-                        <p className="text-xs text-navy-500 mt-0.5">Unlocks after Week 2.</p>
-                      </div>
-                    </div>
+                  <div className="p-8 text-center text-navy-400">
+                    <p className="text-sm">Resources will be available soon.</p>
                   </div>
                 </CardContent>
               </Card>

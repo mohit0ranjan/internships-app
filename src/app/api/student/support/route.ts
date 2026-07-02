@@ -75,10 +75,24 @@ export async function POST(req: Request) {
           }
         }
       },
-      include: { messages: true }
+      include: { 
+        messages: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
     });
 
-    return NextResponse.json({ success: true, ticket });
+    const mappedTicket = {
+      ...ticket,
+      messages: ticket.messages.map(msg => ({
+        id: msg.id,
+        message: msg.content,
+        isFromAdmin: msg.isFromAdmin,
+        createdAt: msg.timestamp,
+      })),
+    };
+
+    return NextResponse.json({ success: true, ticket: mappedTicket });
   } catch (error) {
     console.error('Ticket creation error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -23,7 +23,7 @@ export async function GET() {
       prisma.application.count({
         where: { status: { in: ['SELECTED', 'OFFER_LETTER_SENT', 'JOINED', 'COMPLETED'] } }
       }),
-      prisma.project.count(), // Projects represent workspaces
+      prisma.workspaceAssignment.count(), // Real workspaces
       prisma.application.count({ where: { status: 'JOINED' } }),
       prisma.certificate.count({
         where: { status: { in: ['GENERATED', 'ISSUED'] } }

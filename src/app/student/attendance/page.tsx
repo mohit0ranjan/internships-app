@@ -152,7 +152,7 @@ export default function AttendancePage() {
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-4 mt-2">
                       <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> Check In: {new Date(record.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <Clock className="h-3 w-3" /> Check In: {new Date(record.checkInTime || record.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </div>

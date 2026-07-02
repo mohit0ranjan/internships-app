@@ -19,8 +19,12 @@ export default function SupportPage() {
   const tickets = data?.tickets || []
 
   const handleSubmit = async () => {
-    if (!subject.trim() || !message.trim()) {
-      toast.error('Subject and message are required');
+    if (subject.trim().length < 5) {
+      toast.error('Subject must be at least 5 characters long');
+      return;
+    }
+    if (message.trim().length < 10) {
+      toast.error('Message must be at least 10 characters long');
       return;
     }
 
@@ -96,7 +100,7 @@ export default function SupportPage() {
                   onChange={(e) => setMessage(e.target.value)}
                 ></textarea>
               </div>
-              <Button onClick={handleSubmit} disabled={isSubmitting || !subject.trim() || !message.trim()} className="mt-2">
+              <Button onClick={handleSubmit} disabled={isSubmitting || subject.trim().length < 5 || message.trim().length < 10} className="mt-2">
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                 Submit Ticket
               </Button>

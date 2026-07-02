@@ -148,22 +148,22 @@ export default function ProgressPage() {
                         {sub.status.replace("_", " ")}
                       </Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground">Submitted: {new Date(sub.createdAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-muted-foreground">Submitted: {new Date(sub.submittedAt || Date.now()).toLocaleDateString()}</div>
                     <div className="text-sm mt-2 line-clamp-2 text-navy-800 ">{sub.summary}</div>
                     
-                    {sub.githubUrl && (
+                    {sub.githubLink && (
                       <div className="mt-2 text-xs flex items-center gap-1 text-primary-600 ">
                         <GitBranch className="h-3 w-3" />
-                        <a href={sub.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
-                          {sub.githubUrl}
+                        <a href={sub.githubLink} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                          {sub.githubLink}
                         </a>
                       </div>
                     )}
 
-                    {sub.remarks && (
+                    {sub.adminRemarks && (
                       <div className="mt-3 p-3 bg-white  rounded border text-sm">
                         <span className="font-semibold text-xs text-muted-foreground mb-1 block">Mentor Remarks:</span>
-                        {sub.remarks}
+                        {sub.adminRemarks}
                       </div>
                     )}
                   </div>
